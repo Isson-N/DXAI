@@ -21,3 +21,8 @@ weights/
 *.pt
 *.pth
 *.onnx
+
+# Внешние датасеты: в git только каталог и скрипты
+extra-data/*
+!extra-data/README.md
+!extra-data/download_open.sh
