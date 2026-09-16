@@ -1,0 +1,23 @@
+# Медицинские данные и производные от них — только локально
+data/train/
+data/test/
+data/index/
+data/overview/
+*.zip
+*.dcm
+
+# Материалы организатора
+data/*.pdf
+data/*.docx
+
+# Python, окружения, эксперименты
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+mlruns/
+weights/
+*.pt
+*.pth
+*.onnx
