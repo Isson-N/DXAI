@@ -26,3 +26,10 @@ weights/
 extra-data/*
 !extra-data/README.md
 !extra-data/download_open.sh
+
+# Python-пакет и тесты
+*.egg-info/
+.pytest_cache/
+
+# Материалы организатора (лекции, расшифровки)
+data/*.txt

@@ -102,7 +102,10 @@ def main():
             study_n=int(L.n), study=r.study, path=r.path, sop_uid=r.sop_uid, n_copies=r.n_copies,
             rows=r.rows, cols=r.cols, region=r.region, side=r.side, side_score=r.side_score,
             anatomical_region=SPINE if r.region == "spine" else HIP,
-            labeled=labeled, quality_class=int(total) if labeled else None,
+            # Цель «есть нарушение» = OR отдельных критериев; столбец «Итог» не используется:
+            # организатор на Q&A — «ориентируйтесь на столбцы с конкретными нарушениями, в Итоге есть ошибки»
+            labeled=labeled, quality_class=comps if labeled else None,
+            total_official=int(total) if labeled else None,
             violation_type=";".join(viol), label_consistent=consistent,
             **{f"y_{k}": (int(v) if labeled else None) for k, v in
                {"pos": parts[V_POS], "axis": parts.get(V_AXIS), "foreign": parts.get(V_FOREIGN),

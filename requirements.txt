@@ -1,0 +1,8 @@
+# Зависимости сервиса (контейнер). Версии зафиксированы (п. 3.2 ТЗ).
+et_xmlfile==2.0.0
+numpy==2.5.3
+openpyxl==3.1.5
+pydicom==3.0.2
+pylibjpeg==2.1.0
+pylibjpeg-libjpeg==2.4.0
+pylibjpeg-openjpeg==2.5.0
