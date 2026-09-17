@@ -21,7 +21,7 @@ bash docker/smoke_test.sh                                         # сборка
 | Путь | Что |
 |---|---|
 | `src/dxaqc/` | сервис: `io` (чтение DICOM), `model` (интерфейс, заглушка), `pipeline`, `report` (формат выхода), `cli`; `metrics`, `cv` — протокол валидации |
-| `tools/` | разбор данных (`build_index.py`, `overview_sheets.py`), фолды (`make_folds.py`) |
+| `tools/` | разбор данных (`build_index.py`, `overview_sheets.py`), фолды (`make_folds.py`), разметка поясниц (`spine_annotator.py`, `merge_spine_points.py`; см. `docs/annotation.md`) |
 | `experiments/` | зафиксированные фолды, политика спорных меток, проверка выполнимости |
 | `docker/` | Dockerfile и скрипты сборки/запуска/smoke-теста |
 | `docs/questions_to_organizer.md` | вопросы организатору |
