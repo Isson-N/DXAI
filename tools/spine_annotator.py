@@ -8,6 +8,7 @@ import io
 import json
 import math
 import os
+import pathlib
 import re
 import tempfile
 import threading
@@ -23,7 +24,8 @@ from PIL import Image
 
 SCHEMA = "dxa-spine-points/1"
 VERTEBRAE = ("Th12", "L1", "L2", "L3", "L4", "L5")
-POINT_KEYS = tuple(f"{v}_{side}" for v in VERTEBRAE for side in ("top", "bottom"))
+POINT_KEYS = tuple(f"{v}_center" for v in VERTEBRAE)
+LEGACY_KEYS = tuple(f"{v}_{s}" for v in VERTEBRAE for s in ("top", "bottom"))
 SPACING = {"x": 0.600, "y": 0.606}
 
 
@@ -108,13 +110,9 @@ def derive(annotation):
     centers = {}
     points = annotation["points"]
     for vertebra in VERTEBRAE:
-        top = points.get(vertebra + "_top")
-        bottom = points.get(vertebra + "_bottom")
-        if has_coordinates(top) and has_coordinates(bottom):
-            centers[vertebra] = {
-                "x": (top["x"] + bottom["x"]) / 2,
-                "y": (top["y"] + bottom["y"]) / 2,
-            }
+        center = points.get(vertebra + "_center")
+        if has_coordinates(center):
+            centers[vertebra] = {"x": center["x"], "y": center["y"]}
     annotation["centers"] = centers
     annotation["axis_angle_deg"] = None
     if len(centers) >= 3:
@@ -130,9 +128,9 @@ def derive(annotation):
     crests_done = all(
         isinstance(annotation.get(key), dict)
         and (
-            annotation[key].get("state") == "out_of_frame"
+            annotation[key].get("state") in ("out_of_frame", "partial")
             or (
-                annotation[key].get("state") in ("in_frame", "partial")
+                annotation[key].get("state") == "in_frame"
                 and has_coordinates(annotation[key])
             )
         )
@@ -239,7 +237,7 @@ class Application:
             "rows": item["rows"], "cols": item["cols"], "points": {},
             "crest_left": None, "crest_right": None,
             "th12_half_visible": None, "comment": "",
-            "skip_image": False, "skip_reason": "", "updated_at": "",
+            "skip_image": False, "skip_reason": "", "numbering_uncertain": False, "updated_at": "",
             "seconds_spent": 0.0,
         })
 
@@ -249,7 +247,7 @@ class Application:
         allowed = {
             "study", "study_n", "rows", "cols", "points", "crest_left",
             "crest_right", "th12_half_visible", "comment", "skip_image",
-            "skip_reason", "complete", "updated_at", "seconds_spent",
+            "skip_reason", "numbering_uncertain", "complete", "updated_at", "seconds_spent",
             "centers", "axis_angle_deg",
         }
         if set(raw) - allowed:
@@ -307,6 +305,7 @@ class Application:
         if half is not None and (not isinstance(half, str) or half not in ("yes", "no", "cannot")):
             raise ValueError("Недопустимое значение флага Th12.")
         result["th12_half_visible"] = half
+        result["numbering_uncertain"] = bool(raw.get("numbering_uncertain", False))
         for key, maximum in (("comment", 20000), ("skip_reason", 2000)):
             value = raw.get(key, "")
             if not isinstance(value, str) or len(value) > maximum:
@@ -436,7 +435,8 @@ a{color:#9dd9ff}
 <button id="absent" class="editControl">N · вне кадра / не видно</button>
 <button id="uncertain" class="editControl">U · не определить</button>
 </div>
-<div class="hint">N/U относятся к текущей пластинке. Выберите строку шага для исправления.
+<label class="editControl"><input type="checkbox" id="numberingUncertain"> Нумерация позвонков неуверенная</label>
+<div class="hint">N/U относятся к текущему позвонку. Выберите строку шага для исправления.
 Существующую точку можно перетащить.</div>
 </section>
 <section class="controls">
@@ -465,6 +465,7 @@ a{color:#9dd9ff}
 </section>
 <div class="row">
 <button id="undo" class="editControl">Отменить · Z</button>
+<button id="resetImage" class="editControl">Сбросить снимок</button>
 <button id="back">← Назад</button><button id="next">Далее →</button>
 </div>
 <div id="position" class="hint"></div>
@@ -480,34 +481,35 @@ a{color:#9dd9ff}
 L5 — последний над крестцом; верхние края подвздошных костей обычно на уровне L4–L5.
 Если нумерация неочевидна (переходный позвонок, 6 поясничных), отметьте в комментарии
 и размечайте по лучшему пониманию, спорную точку — «U».</li>
-<li>Середина верхней/нижней замыкательной пластинки — середина видимого края тела
-позвонка (не остистого и не поперечных отростков) между его левым и правым углом.</li>
-<li>Позвонок частично за кадром: если пластинка не видна — «N». Если видна, но положение
-неясно (наложение, артефакт) — «U».</li>
+<li>Центр тела позвонка — середина тела (не остистого и не поперечных отростков):
+на глаз середина между верхней и нижней замыкательными пластинками и между левым и правым краем тела.
+Точность до 2–3 пикселей достаточна: по центрам строится только ось.</li>
+<li>Позвонок частично за кадром: если тело не видно — «N». Если видно, но центр определить
+нельзя (наложение, артефакт) — «U».</li>
 <li>Гребни: самая верхняя точка гребня подвздошной кости слева и справа на экране.
-«Частично» — гребень срезан краем кадра, вершина может быть за кадром.</li>
+Если вершина срезана краем кадра — «частично» (клавиша 2) <b>без точки</b>, не ставьте её на границе кадра.
+«Вне кадра» (3) — гребня не видно совсем.</li>
+<li>Если не уверены, какой позвонок Th12 (переходный позвонок, необычная анатомия) — поставьте галочку
+«Нумерация позвонков неуверенная». Точки всё равно ставьте: для угла оси названия позвонков не нужны,
+важен только порядок сверху вниз.</li>
 <li>Th12: «видна ≥ половины» — в кадре не меньше половины высоты тела Th12;
 «&lt; половины»; «не определить» — Th12 не идентифицируется.</li>
 <li>Сколиоз, перелом, металл не мешают разметке: ставьте точки по фактическому положению тел.
 Посторонние предметы не размечаем.</li>
 <li>Сомневаетесь — комментарий. Лучше «U», чем угадывать.</li>
 </ol>
-<svg viewBox="0 0 660 230" width="660" role="img" aria-label="Середины пластинок и вычисленный центр тела позвонка">
+<svg viewBox="0 0 660 230" width="660" role="img" aria-label="Центр тела позвонка">
 <path d="M90 50 Q170 25 250 50 L260 180 Q170 200 80 180 Z"
  fill="#40566e" stroke="#d4e1ef" stroke-width="3"/>
 <path d="M90 50 Q170 25 250 50 M80 180 Q170 200 260 180" fill="none" stroke="#ffdb80" stroke-width="4"/>
-<path d="M170 38 L170 190" stroke="#91e6c7" stroke-dasharray="5 5"/>
-<circle cx="170" cy="38" r="7" fill="#ffda69"/>
-<circle cx="170" cy="190" r="7" fill="#ffda69"/>
-<path d="M163 114 L177 114 M170 107 L170 121" stroke="#83ffe0" stroke-width="3"/>
-<g stroke="#b6cadc"><path d="M180 38 L305 38"/><path d="M182 114 L305 114"/><path d="M180 190 L305 190"/></g>
+<circle cx="170" cy="114" r="9" fill="#ffda69"/>
+<path d="M158 114 L182 114 M170 102 L170 126" stroke="#83ffe0" stroke-width="3"/>
+<g stroke="#b6cadc"><path d="M186 114 L305 114"/></g>
 <g fill="#eef4fa" font-size="17" font-family="sans-serif">
-<text x="315" y="44">top: середина верхней пластинки</text>
-<text x="315" y="120">центр: середина top–bottom</text>
-<text x="315" y="196">bottom: середина нижней пластинки</text>
+<text x="315" y="120">один клик: центр тела позвонка</text>
 </g>
 </svg>
-<p>Последовательно: 12 точек пластинок → два гребня с состояниями → флаг Th12.
+<p>Последовательно: 6 центров тел позвонков → два гребня с состояниями → флаг Th12.
 Координаты сохраняются в пикселях исходного снимка. Гребни именуются по сторонам
 экрана, а не по анатомической стороне пациента.</p>
 <p>Масштаб по умолчанию ×3. Колесо — приближение под курсором (×1…×10);
@@ -522,7 +524,9 @@ L5 — последний над крестцом; верхние края по�
 "use strict";
 const $ = id => document.getElementById(id);
 const vertebrae = ["Th12","L1","L2","L3","L4","L5"];
-const keys = vertebrae.flatMap(v => [v+"_top",v+"_bottom"]).concat(["crest_left","crest_right","th12_half_visible"]);
+const keys = vertebrae.map(v => v+"_center").concat(["crest_left","crest_right","th12_half_visible"]);
+const NV = vertebrae.length;            // 6 точек-центров
+const CREST0 = NV, FLAG = NV+2, TOTAL = NV+3;
 const copy = value => JSON.parse(JSON.stringify(value));
 let state, items=[], current=null, ann=null, image=null, index=-1, step=0;
 let mode="edit", help=false, loading=false, history=[], zoom=3, offsetX=0, offsetY=0;
@@ -566,28 +570,28 @@ function coords(p) {return p && Number.isFinite(p.x) && Number.isFinite(p.y);}
 function done(i) {
     if(!ann) return false;
     const key=keys[i];
-    if(i<12) return !!ann.points[key];
-    if(i<14) {
+    if(i<NV) return !!ann.points[key];
+    if(i<FLAG) {
         const p=ann[key];
-        return !!p && (p.state==="out_of_frame" ||
-            (coords(p) && ["in_frame","partial"].includes(p.state)));
+        return !!p && (["out_of_frame","partial"].includes(p.state) ||
+            (coords(p) && p.state==="in_frame"));
     }
     return ["yes","no","cannot"].includes(ann.th12_half_visible);
 }
 function complete() {return !!ann && (ann.skip_image || keys.every((k,i)=>done(i)));}
 function firstMissing() {
     const found=keys.findIndex((key,i)=>!done(i));
-    return found<0 ? 15 : found;
+    return found<0 ? TOTAL : found;
 }
 function nextMissing(after) {
-    for(let i=after+1;i<15;i++) if(!done(i)) return i;
+    for(let i=after+1;i<TOTAL;i++) if(!done(i)) return i;
     return firstMissing();
 }
 function label(key) {
     if(key==="crest_left") return "гребень Л";
     if(key==="crest_right") return "гребень П";
     if(key==="th12_half_visible") return "Половина Th12";
-    return key.replace("_top","↑").replace("_bottom","↓");
+    return key.replace("_center","");
 }
 function localMetadata() {
     if(!current || !ann) return;
@@ -664,6 +668,7 @@ function chosenList() {
 }
 function syncFields() {
     $("comment").value=ann ? ann.comment : "";
+    $("numberingUncertain").checked=!!ann?.numbering_uncertain;
     $("skip").checked=!!ann?.skip_image;
     $("skipReason").value=ann ? ann.skip_reason : "";
 }
@@ -682,30 +687,30 @@ function render() {
     else if(ann) {
         if(mode==="view") prompt="Просмотр · только чтение";
         else if(ann.skip_image) prompt="Снимок пропущен. Причина сохранена.";
-        else if(step<12) {
+        else if(step<NV) {
             const [v,side]=keys[step].split("_");
-            prompt=`Кликните середину ${side==="top"?"ВЕРХНЕЙ":"НИЖНЕЙ"} пластинки ${v}`;
-        } else if(step<14) {
+            prompt=`Кликните ЦЕНТР тела позвонка ${v}`;
+        } else if(step<FLAG) {
             const p=ann[keys[step]];
-            prompt=`Гребень ${step===12?"СЛЕВА":"СПРАВА"} на экране: `;
+            prompt=`Гребень ${step===CREST0?"СЛЕВА":"СПРАВА"} на экране: `;
             prompt+=!coords(p) ? "кликните вершину и выберите состояние (1/2/3)" :
                 "выберите состояние (1/2/3)";
-        } else if(step===14) prompt="Видна ли ≥ половины тела Th12? Y / H / C";
+        } else if(step===FLAG) prompt="Видна ли ≥ половины тела Th12? Y / H / C";
         else prompt="Разметка завершена. Можно перейти далее.";
     }
     $("prompt").textContent=prompt;
     $("steps").replaceChildren();
     keys.forEach((key,i)=>{
         const button=document.createElement("button");
-        const p=i<14 ? point(key) : null;
+        const p=i<FLAG ? point(key) : null;
         let status=done(i)?"✓":"○";
         if(p?.state==="absent") status="N";
         if(p?.state==="uncertain") status="U";
         if(p?.state==="out_of_frame") status="3";
         button.textContent=`${status} ${label(key)}`;
-        if(i>=12 && i<14 && p?.state)
+        if(i>=CREST0 && i<FLAG && p?.state)
             button.textContent+=" · "+({in_frame:"в кадре",partial:"частично",out_of_frame:"вне кадра"}[p.state]);
-        if(i===14 && ann?.th12_half_visible)
+        if(i===FLAG && ann?.th12_half_visible)
             button.textContent+=" · "+({yes:"≥½",no:"<½",cannot:"?"}[ann.th12_half_visible]);
         button.className=(done(i)?"done ":"")+(p?.state?"marked ":"")+(i===step?"current":"");
         button.disabled=!ann || loading || mode!=="edit";
@@ -713,13 +718,13 @@ function render() {
         $("steps").append(button);
     });
     document.querySelectorAll(".editControl").forEach(el=>el.disabled=!editable());
-    $("absent").disabled=$("uncertain").disabled=!editable()||step>=12||ann.skip_image;
+    $("absent").disabled=$("uncertain").disabled=!editable()||step>=NV||ann.skip_image;
     document.querySelectorAll("[data-crest]").forEach(el=>{
-        el.disabled=!editable()||step<12||step>13||ann.skip_image;
-        el.classList.toggle("active",!!ann && step>=12 && step<14 && ann[keys[step]]?.state===el.dataset.crest);
+        el.disabled=!editable()||step<CREST0||step>=FLAG||ann.skip_image;
+        el.classList.toggle("active",!!ann && step>=CREST0 && step<FLAG && ann[keys[step]]?.state===el.dataset.crest);
     });
     document.querySelectorAll("[data-half]").forEach(el=>{
-        el.disabled=!editable()||step!==14||ann.skip_image;
+        el.disabled=!editable()||step!==FLAG||ann.skip_image;
         el.classList.toggle("active",ann?.th12_half_visible===el.dataset.half);
     });
     $("undo").disabled=!editable()||!history.length;
@@ -750,13 +755,13 @@ function bounded(p) {
 }
 function placements() {
     if(!ann) return [];
-    return keys.slice(0,14).map(key=>({key,p:point(key)})).filter(it=>coords(it.p));
+    return keys.slice(0,FLAG).map(key=>({key,p:point(key)})).filter(it=>coords(it.p));
 }
 function centers() {
     if(!ann) return [];
     return vertebrae.map(v=>{
-        const a=ann.points[v+"_top"], b=ann.points[v+"_bottom"];
-        return coords(a)&&coords(b) ? {x:(a.x+b.x)/2,y:(a.y+b.y)/2,v} : null;
+        const c=ann.points[v+"_center"];
+        return coords(c) ? {x:c.x,y:c.y,v} : null;
     }).filter(Boolean);
 }
 function draw() {
@@ -824,10 +829,10 @@ function imagePoint(p) {
     return bounded(q);
 }
 function applyPoint(p) {
-    if(!editable()||ann.skip_image||step>=14) return;
+    if(!editable()||ann.skip_image||step>=FLAG) return;
     const key=keys[step];
     mutate(()=>{
-        if(step<12) ann.points[key]=p;
+        if(step<NV) ann.points[key]=p;
         else {
             const old=ann[key]?.state;
             ann[key]={...p};
@@ -836,11 +841,11 @@ function applyPoint(p) {
     },true);
 }
 function setPointState(value) {
-    if(!editable()||ann.skip_image||step>=12) return;
+    if(!editable()||ann.skip_image||step>=NV) return;
     mutate(()=>{ann.points[keys[step]]={state:value};},true);
 }
 function setCrestState(value) {
-    if(!editable()||ann.skip_image||step<12||step>13) return;
+    if(!editable()||ann.skip_image||step<CREST0||step>=FLAG) return;
     const key=keys[step];
     mutate(()=>{
         const old=ann[key];
@@ -849,7 +854,7 @@ function setCrestState(value) {
     },true);
 }
 function setHalf(value) {
-    if(!editable()||ann.skip_image||step!==14) return;
+    if(!editable()||ann.skip_image||step!==FLAG) return;
     mutate(()=>{ann.th12_half_visible=value;},true);
 }
 async function loadItem(item) {
@@ -988,6 +993,7 @@ $("uncertain").onclick=()=>setPointState("uncertain");
 document.querySelectorAll("[data-crest]").forEach(el=>el.onclick=()=>setCrestState(el.dataset.crest));
 document.querySelectorAll("[data-half]").forEach(el=>el.onclick=()=>setHalf(el.dataset.half));
 $("comment").oninput=()=>mutate(()=>{ann.comment=$("comment").value;});
+$("numberingUncertain").onchange=()=>mutate(()=>{ann.numbering_uncertain=$("numberingUncertain").checked;});
 $("skipReason").oninput=()=>{
     // При удалении последнего символа причины одновременно снимаем пропуск,
     // поэтому на сервер никогда не попадает пропуск без причины.
@@ -1009,6 +1015,18 @@ $("skip").onchange=()=>{
     syncFields();
 };
 $("undo").onclick=undo;
+$("resetImage").onclick=()=>{
+    // Полный сброс текущего снимка: одно действие в истории, отменяется через Z
+    if(!editable() || !ann) return;
+    if(!window.confirm("Стереть всю разметку этого снимка?")) return;
+    account();
+    const elapsed=ann.seconds_spent;
+    history.push({annotation:copy(ann),step});
+    ann={...ann, points:{}, crest_left:null, crest_right:null, th12_half_visible:null,
+         comment:"", skip_image:false, skip_reason:"", numbering_uncertain:false, seconds_spent:elapsed};
+    step=0;
+    localMetadata(); enqueueSave(); syncFields(); render();
+};
 $("back").onclick=()=>navigate(-1);$("next").onclick=()=>navigate(1);
 $("retry").onclick=()=>enqueueSave();
 $("editTab").onclick=()=>setMode("edit");$("viewTab").onclick=()=>setMode("view");
@@ -1246,6 +1264,8 @@ def main():
     parser.add_argument("--port", type=int, default=8765, help="Порт сервера (8765)")
     parser.add_argument("--host", default="127.0.0.1", help="Адрес сервера (127.0.0.1)")
     parser.add_argument("--out", default="data/annotations", help="Папка результатов")
+    parser.add_argument("--reset", action="store_true",
+                        help="Начать разметку заново: старый файл переименовывается в *.bak-<дата>")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_-]+", args.annotator):
         parser.error("--annotator: разрешены только латинские буквы, цифры, _ и -.")
@@ -1253,6 +1273,12 @@ def main():
         parser.error("--port должен быть от 1 до 65535.")
     if args.host not in ("127.0.0.1", "localhost"):
         print("ВНИМАНИЕ: адрес не является стандартным loopback; не открывайте медицинские данные наружу.")
+    if args.reset:
+        existing = pathlib.Path(args.out) / f"spine_points_{args.annotator}.json"
+        if existing.exists():
+            backup = existing.with_suffix(f".bak-{datetime.now():%Y%m%d-%H%M%S}.json")
+            existing.rename(backup)
+            print(f"Старая разметка сохранена в {backup}")
     try:
         app = Application(args)
         server = Server((args.host, args.port), app)

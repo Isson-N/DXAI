@@ -17,13 +17,29 @@ VERTEBRAE = ["Th12", "L1", "L2", "L3", "L4", "L5"]
 SX, SY = 0.600, 0.606  # мм/пиксель выгруженных изображений (PLAN.md, решение 17.09.2026)
 
 
-def centers(points: dict) -> list[tuple[float, float]]:
-    out = []
+def normalize(points: dict) -> dict:
+    """Приводит к центрам тел. Старый формат (две пластинки на позвонок) → середина между ними."""
+    out = {}
     for v in VERTEBRAE:
-        t, b = points.get(f"{v}_top", {}), points.get(f"{v}_bottom", {})
+        c = points.get(f"{v}_center")
+        if isinstance(c, dict) and "x" in c:
+            out[v] = {"x": c["x"], "y": c["y"]}
+            continue
+        t, b = points.get(f"{v}_top") or {}, points.get(f"{v}_bottom") or {}
         if "x" in t and "x" in b:
-            out.append(((t["x"] + b["x"]) / 2, (t["y"] + b["y"]) / 2))
+            out[v] = {"x": (t["x"] + b["x"]) / 2, "y": (t["y"] + b["y"]) / 2}
+        elif "x" in t or "x" in b:
+            q = t if "x" in t else b
+            out[v] = {"x": q["x"], "y": q["y"], "half_only": True}
+        else:
+            state = (c or t or b or {}).get("state")
+            if state:
+                out[v] = {"state": state}
     return out
+
+
+def centers(points: dict) -> list[tuple[float, float]]:
+    return [(p["x"], p["y"]) for p in normalize(points).values() if "x" in p]
 
 
 def axis_angle(points: dict) -> float | None:
@@ -41,9 +57,10 @@ def axis_angle(points: dict) -> float | None:
 
 
 def agreement(a: dict, b: dict) -> dict:
+    na, nb = normalize(a["points"]), normalize(b["points"])
     dists = []
-    for key, pa in a["points"].items():
-        pb = b["points"].get(key, {})
+    for key, pa in na.items():
+        pb = nb.get(key, {})
         if "x" in pa and "x" in pb:
             dists.append(math.hypot((pa["x"] - pb["x"]) * SX, (pa["y"] - pb["y"]) * SY))
     angle_a, angle_b = axis_angle(a["points"]), axis_angle(b["points"])
@@ -70,7 +87,8 @@ def main():
         for image_id, ann in data["images"].items():
             entry = merged["images"].setdefault(image_id, {"study": ann["study"], "study_n": ann["study_n"],
                                                            "annotations": []})
-            entry["annotations"].append({"annotator": data["annotator"], **ann})
+            entry["annotations"].append({"annotator": data["annotator"], **ann,
+                                         "centers_px": normalize(ann.get("points", {}))})
 
     rows = []
     for image_id, entry in merged["images"].items():
