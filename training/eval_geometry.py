@@ -15,6 +15,9 @@ import argparse
 import json
 from pathlib import Path
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -22,35 +25,25 @@ from sklearn.metrics import roc_auc_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from bootstrap_auc import cluster_bootstrap_auc
+
 ANGLES = ["angle_chord", "angle_ls", "angle_robust"]
 NUMERIC = ANGLES + ["max_dev_chord", "curvature", "n_points", "span_mm"]
 STATES = ["crest_left_state", "crest_right_state", "th12_half_visible"]
 
 
 def cluster_ci(y, score, groups, n_boot=2000, seed=11):
-    rng = np.random.default_rng(seed)
-    keys = np.unique(groups)
-    values = []
-    for _ in range(n_boot):
-        pick = rng.integers(0, len(keys), len(keys))
-        w = np.bincount(pick, minlength=len(keys))[np.searchsorted(keys, groups)].astype(float)
-        if w[y == 1].sum() == 0 or w[y == 0].sum() == 0:
-            continue
-        keep = w > 0
-        values.append(roc_auc_score(y[keep], score[keep], sample_weight=w[keep]))
-    if not values:
-        return [None, None]
-    return [round(float(x), 3) for x in np.percentile(values, [2.5, 97.5])]
+    return cluster_bootstrap_auc(y, score, groups, n_boot, seed)[0]
 
 
-def auc_of(y, score, groups):
+def auc_of(y, score, groups, n_boot=500):
     good = np.isfinite(score) & np.isfinite(y)
     if good.sum() < 5 or len(np.unique(y[good])) < 2:
         return None
     y, score, groups = y[good].astype(int), score[good], groups[good]
     # Признак может быть как прямым, так и обратным: берём как есть, знак в отчёте.
     return {"auc": round(float(roc_auc_score(y, score)), 3),
-            "ci95": cluster_ci(y, score, groups), "n": int(len(y)), "n_pos": int(y.sum())}
+            "ci95": cluster_ci(y, score, groups, n_boot), "n": int(len(y)), "n_pos": int(y.sum())}
 
 
 def rule_counts(y, decision):

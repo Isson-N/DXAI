@@ -11,11 +11,15 @@
 import argparse
 import itertools
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bootstrap_auc import prepare_auc, weighted_auc
 
 HEADS = ["region", "spine_pos", "spine_axis", "spine_foreign", "spine_any",
          "hip_pos", "hip_roi", "hip_any"]
@@ -28,11 +32,10 @@ def f1_score_counts(y, pred, weights):
     return float(2 * tp / (2 * tp + fp + fn)) if 2 * tp + fp + fn else 0.0
 
 
-def auc(y, p, weights):
+def auc(y, p, weights, prepared=None):
     if weights[y == 1].sum() == 0 or weights[y == 0].sum() == 0:
         return np.nan
-    keep = weights > 0
-    return float(roc_auc_score(y[keep], p[keep], sample_weight=weights[keep]))
+    return weighted_auc(y, weights, prepared if prepared is not None else prepare_auc(p))
 
 
 def load(paths):
@@ -83,15 +86,16 @@ def paired_bootstrap(a, b, head, n_boot, seed):
     rng = np.random.default_rng(seed)
     ones = np.ones(len(y))
     diff_f1, diff_auc = [], []
+    prep_a, prep_b = prepare_auc(pa), prepare_auc(pb)
     base = {"f1_a": f1_score_counts(y, da, ones), "f1_b": f1_score_counts(y, db, ones),
-            "auc_a": auc(y, pa, ones), "auc_b": auc(y, pb, ones)}
+            "auc_a": auc(y, pa, ones, prep_a), "auc_b": auc(y, pb, ones, prep_b)}
     for _ in range(n_boot):
         pick = rng.integers(0, len(studies), len(studies))
         w = np.bincount(pick, minlength=len(studies))[groups].astype(float)
         if w[y == 1].sum() == 0 or w[y == 0].sum() == 0:
             continue
         diff_f1.append(f1_score_counts(y, da, w) - f1_score_counts(y, db, w))
-        diff_auc.append(auc(y, pa, w) - auc(y, pb, w))
+        diff_auc.append(auc(y, pa, w, prep_a) - auc(y, pb, w, prep_b))
     if not diff_f1:
         return None
     diff_f1, diff_auc = np.array(diff_f1), np.array(diff_auc)
