@@ -1,0 +1,117 @@
+{
+  "points": {
+    "Th12": {
+      "median_mm": 117.42729446715084,
+      "p90_mm": 183.96061087678115,
+      "unpredicted_fraction": 0.0
+    },
+    "L1": {
+      "median_mm": 108.31045388212927,
+      "p90_mm": 157.0797940667573,
+      "unpredicted_fraction": 0.0
+    },
+    "L2": {
+      "median_mm": 111.61265447818201,
+      "p90_mm": 139.78108786635443,
+      "unpredicted_fraction": 0.0
+    },
+    "L3": {
+      "median_mm": 83.28819039198274,
+      "p90_mm": 125.44942727875804,
+      "unpredicted_fraction": 0.0
+    },
+    "L4": {
+      "median_mm": 106.0434256802791,
+      "p90_mm": 167.78458370666962,
+      "unpredicted_fraction": 0.18556701030927836
+    },
+    "L5": {
+      "median_mm": 94.63857530405235,
+      "p90_mm": 191.48469793056375,
+      "unpredicted_fraction": 0.0
+    },
+    "crest_left": {
+      "median_mm": 142.44241403426767,
+      "p90_mm": 179.28202663153976,
+      "unpredicted_fraction": 0.0
+    },
+    "crest_right": {
+      "median_mm": 134.2637747647971,
+      "p90_mm": 225.47111201635232,
+      "unpredicted_fraction": 0.0
+    }
+  },
+  "angles": {
+    "angle_chord": 29.967392163151953,
+    "angle_ls": 23.73326532174693,
+    "angle_robust": 26.955163417540685
+  },
+  "classification": {
+    "crest_left": {
+      "accuracy": 0.6701030927835051,
+      "confusion_matrix": [
+        [
+          26,
+          15,
+          0
+        ],
+        [
+          13,
+          39,
+          0
+        ],
+        [
+          0,
+          4,
+          0
+        ]
+      ]
+    },
+    "crest_right": {
+      "accuracy": 0.5773195876288659,
+      "confusion_matrix": [
+        [
+          31,
+          13,
+          0
+        ],
+        [
+          23,
+          25,
+          0
+        ],
+        [
+          0,
+          5,
+          0
+        ]
+      ]
+    },
+    "th12_half_visible": {
+      "accuracy": 0.8484848484848485,
+      "confusion_matrix": [
+        [
+          84,
+          0,
+          0
+        ],
+        [
+          4,
+          0,
+          0
+        ],
+        [
+          11,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "training_seconds": 785.881041765213,
+  "environment": {
+    "python": "3.11.15 | packaged by conda-forge | (main, Jun 11 2026, 03:34:02) [GCC 14.3.0]",
+    "torch": "2.8.0+cu128",
+    "device": "cuda"
+  }
+}

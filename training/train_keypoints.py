@@ -177,7 +177,7 @@ class KeypointDataset(Dataset):
         image = image[None].repeat(3, 1, 1)
 
         ann = self.annotations.get(uid, {})
-        target = torch.zeros((8, self.hm_size, self.hm_size), dtype=torch.float32)
+        target_xy = torch.zeros((8, 2), dtype=torch.float32)
         mask = torch.zeros(8, dtype=torch.float32)
         true_xy = torch.full((8, 2), float("nan"))
         for j, name in enumerate(POINTS):
@@ -186,10 +186,8 @@ class KeypointDataset(Dataset):
                 x = float(p["x"]) * scale + ox
                 y = float(p["y"]) * scale + oy
                 true_xy[j] = torch.tensor([float(p["x"]), float(p["y"])])
-                hx, hy = x / 2.0, y / 2.0
-                yy, xx = grid(self.hm_size)
-                g = torch.exp(-((xx - hx) ** 2 + (yy - hy) ** 2) / (2 * 2.5 ** 2))
-                target[j] = g
+                # Доли входного квадрата: карта меньше входа, но координата нормирована одинаково.
+                target_xy[j] = torch.tensor([x / self.size, y / self.size])
                 mask[j] = 1.0
 
         labels = []
@@ -201,7 +199,7 @@ class KeypointDataset(Dataset):
 
         return {
             "image": image,
-            "target": target,
+            "target_xy": target_xy,
             "mask": mask,
             "labels": torch.tensor(labels, dtype=torch.long),
             "true_xy": true_xy,
@@ -209,34 +207,41 @@ class KeypointDataset(Dataset):
         }
 
 
-def decode_heatmaps(hm, threshold):
-    prob = torch.sigmoid(hm)
-    b, c, h, w = prob.shape
-    coords = torch.full((b, c, 2), float("nan"), device=hm.device)
-    scores = prob.amax(dim=(-1, -2))
-    for bi in range(b):
-        for ci in range(c):
-            score = scores[bi, ci]
-            if float(score) < threshold:
-                continue
-            flat = prob[bi, ci].argmax()
-            yy, xx = divmod(int(flat), w)
-            y0, y1 = max(0, yy - 2), min(h, yy + 3)
-            x0, x1 = max(0, xx - 2), min(w, xx + 3)
-            patch = prob[bi, ci, y0:y1, x0:x1]
-            gy, gx = torch.meshgrid(
-                torch.arange(y0, y1, device=hm.device),
-                torch.arange(x0, x1, device=hm.device),
-                indexing="ij",
-            )
-            den = patch.sum().clamp_min(1e-8)
-            coords[bi, ci, 0] = (gx * patch).sum() / den * 2
-            coords[bi, ci, 1] = (gy * patch).sum() / den * 2
-    return coords, scores
+def target_kl(heatmaps, target_xy, sigma_norm):
+    """KL(целевой гауссиан ‖ предсказанное распределение): центр верный, но карта размазана — штрафуем."""
+    b, c, h, w = heatmaps.shape
+    log_prob = (heatmaps.reshape(b, c, -1)).log_softmax(-1).reshape(b, c, h, w)
+    ys = torch.linspace(0, 1, h, device=heatmaps.device).view(1, 1, h, 1)
+    xs = torch.linspace(0, 1, w, device=heatmaps.device).view(1, 1, 1, w)
+    d2 = (xs - target_xy[..., 0:1, None]) ** 2 + (ys - target_xy[..., 1:2, None]) ** 2
+    g = torch.exp(-d2 / (2 * sigma_norm ** 2))
+    g = g / g.sum(dim=(-1, -2), keepdim=True).clamp_min(1e-8)
+    return (g * (torch.log(g.clamp_min(1e-12)) - log_prob)).sum(dim=(-1, -2))
+
+
+def soft_argmax(heatmaps, temperature=1.0):
+    """Пространственный softmax → ожидаемые координаты в долях карты [0, 1] и мера разброса.
+
+    MSE по разреженному гауссиану на 60 обучающих снимках не сходится (карты выходят
+    размытыми, медианная ошибка была ~100 мм). Здесь градиент идёт прямо в координату.
+    """
+    b, c, h, w = heatmaps.shape
+    flat = (heatmaps.reshape(b, c, -1) / temperature).softmax(-1)
+    prob = flat.reshape(b, c, h, w)
+    ys = torch.linspace(0, 1, h, device=heatmaps.device).view(1, 1, h, 1)
+    xs = torch.linspace(0, 1, w, device=heatmaps.device).view(1, 1, 1, w)
+    ex = (prob * xs).sum(dim=(-1, -2))
+    ey = (prob * ys).sum(dim=(-1, -2))
+    spread = ((prob * (xs - ex[..., None, None]) ** 2).sum(dim=(-1, -2))
+              + (prob * (ys - ey[..., None, None]) ** 2).sum(dim=(-1, -2)))
+    return torch.stack([ex, ey], dim=-1), spread
 
 
 def train_one(model, train_loader, val_loader, device, args):
-    opt = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=1e-4)
+    encoder = [p for n, p in model.named_parameters() if n.startswith("encoder.")]
+    rest = [p for n, p in model.named_parameters() if not n.startswith("encoder.")]
+    opt = torch.optim.AdamW([{"params": encoder, "lr": args.encoder_lr},
+                             {"params": rest, "lr": args.lr}], weight_decay=1e-4)
     sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, args.epochs)
     amp = device.type == "cuda"
     scaler = torch.cuda.amp.GradScaler(enabled=amp)
@@ -247,15 +252,20 @@ def train_one(model, train_loader, val_loader, device, args):
         model.train()
         for batch in train_loader:
             image = batch["image"].to(device)
-            target = batch["target"].to(device)
+            target_xy = batch["target_xy"].to(device)   # доли карты [0, 1]
             mask = batch["mask"].to(device)
             labels = batch["labels"].to(device)
             opt.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast(enabled=amp):
-                pred_hm, pred_cls = model(image)
-                hm_loss = (((torch.sigmoid(pred_hm) - target) ** 2) * mask[:, :, None, None]).sum()
-                # на пиксель, иначе лосс ~10^3 и классификационные головы не учатся
-                hm_loss = hm_loss / (mask.sum().clamp_min(1) * pred_hm.shape[-1] * pred_hm.shape[-2])
+                pred_hm, presence, pred_cls = model(image)
+                coords, spread = soft_argmax(pred_hm)
+                error = (coords - target_xy).abs().sum(-1)
+                point_loss = (error * mask).sum() / mask.sum().clamp_min(1)
+                # Штраф за размытость — только там, где точка есть.
+                spread_loss = (spread * mask).sum() / mask.sum().clamp_min(1)
+                kl = target_kl(pred_hm, target_xy, args.sigma / args.size)
+                map_loss = (kl * mask).sum() / mask.sum().clamp_min(1)
+                presence_loss = F.binary_cross_entropy_with_logits(presence, mask)
                 cls_loss = 0
                 ncls = 0
                 for k in range(3):
@@ -264,7 +274,9 @@ def train_one(model, train_loader, val_loader, device, args):
                         cls_loss = cls_loss + F.cross_entropy(pred_cls[valid, k], labels[valid, k])
                         ncls += 1
                 cls_loss = cls_loss / max(ncls, 1)
-                loss = args.heatmap_weight * hm_loss + args.class_weight * cls_loss
+                loss = (args.heatmap_weight * point_loss + args.spread_weight * spread_loss
+                        + args.map_weight * map_loss + args.presence_weight * presence_loss
+                        + args.class_weight * cls_loss)
             scaler.scale(loss).backward()
             scaler.step(opt)
             scaler.update()
@@ -275,12 +287,12 @@ def train_one(model, train_loader, val_loader, device, args):
         with torch.no_grad():
             for batch in val_loader:
                 image = batch["image"].to(device)
-                target = batch["target"].to(device)
+                target_xy = batch["target_xy"].to(device)
                 mask = batch["mask"].to(device)
-                pred_hm, _ = model(image)
-                v = (((torch.sigmoid(pred_hm) - target) ** 2) * mask[:, :, None, None]).sum()
-                v = v / (mask.sum().clamp_min(1) * pred_hm.shape[-1] * pred_hm.shape[-2])
-                vals.append(float(v))
+                pred_hm, _, _ = model(image)
+                coords, _ = soft_argmax(pred_hm)
+                error = ((coords - target_xy).abs().sum(-1) * mask).sum() / mask.sum().clamp_min(1)
+                vals.append(float(error))
         score = float(np.mean(vals)) if vals else float("inf")
         if score < best:
             best = score
@@ -377,14 +389,20 @@ def main():
     ap.add_argument("--root", default=".")
     ap.add_argument("--out", default="experiments/results/keypoints")
     ap.add_argument("--size", type=int, default=384)
-    ap.add_argument("--epochs", type=int, default=60)
+    ap.add_argument("--epochs", type=int, default=150)
+    ap.add_argument("--lr", type=float, default=3e-4)
+    ap.add_argument("--encoder-lr", type=float, default=1e-4)
+    ap.add_argument("--sigma", type=float, default=5.0, help="σ целевого пятна, px входа")
+    ap.add_argument("--map-weight", type=float, default=0.02, help="вес KL к целевому пятну")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     ap.add_argument("--workers", type=int, default=0)
-    ap.add_argument("--point-threshold", type=float, default=0.2)
+    ap.add_argument("--point-threshold", type=float, default=0.5, help="порог головы присутствия точки")
     ap.add_argument("--only-fold", type=int, default=None, help="только один внешний фолд (дымовой тест)")
     ap.add_argument("--final-model", default=None, help="куда сохранить модель для сервиса")
-    ap.add_argument("--heatmap-weight", type=float, default=100.0)
+    ap.add_argument("--heatmap-weight", type=float, default=1.0, help="вес L1 по координатам")
+    ap.add_argument("--spread-weight", type=float, default=0.5, help="штраф за размытость карты")
+    ap.add_argument("--presence-weight", type=float, default=0.3)
     ap.add_argument("--class-weight", type=float, default=1.0)
     ap.add_argument("--pretrained", dest="pretrained", action="store_true", default=True)
     ap.add_argument("--no-pretrained", dest="pretrained", action="store_false")
@@ -438,11 +456,11 @@ def main():
 
         with torch.no_grad():
             for batch in te_loader:
-                hm, logits = model(batch["image"].to(device))
-                coords, scores = decode_heatmaps(hm, args.point_threshold)
-                cls_pred = logits.argmax(-1).cpu().numpy()
+                hm, presence, logits = model(batch["image"].to(device))
+                coords, _ = soft_argmax(hm)
+                scores = torch.sigmoid(presence).cpu().numpy()
                 coords = coords.cpu().numpy()
-                scores = scores.cpu().numpy()
+                cls_pred = logits.argmax(-1).cpu().numpy()
                 true_xy = batch["true_xy"].numpy()
 
                 for bi, uid in enumerate(batch["uid"]):
@@ -454,10 +472,10 @@ def main():
                         "sop_uid": uid, "study": row["study"], "study_n": row["study_n"], "fold": int(fold)
                     }
                     for j, name in enumerate(POINTS):
-                        if np.isfinite(coords[bi, j]).all():
+                        if scores[bi, j] >= args.point_threshold:
                             _, scale, ox, oy, _, _ = image_cache[uid]
-                            px = (coords[bi, j, 0] - ox) / scale
-                            py = (coords[bi, j, 1] - oy) / scale
+                            px = (coords[bi, j, 0] * args.size - ox) / scale
+                            py = (coords[bi, j, 1] * args.size - oy) / scale
                             pred_orig.append([px, py])
                             prow[f"{name}_x_pred"] = px
                             prow[f"{name}_y_pred"] = py
