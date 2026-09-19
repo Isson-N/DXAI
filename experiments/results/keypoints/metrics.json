@@ -1,63 +1,63 @@
 {
   "points": {
     "Th12": {
-      "median_mm": 117.42729446715084,
-      "p90_mm": 183.96061087678115,
+      "median_mm": 4.970470824327459,
+      "p90_mm": 26.403624341585843,
       "unpredicted_fraction": 0.0
     },
     "L1": {
-      "median_mm": 108.31045388212927,
-      "p90_mm": 157.0797940667573,
+      "median_mm": 3.7560321883223717,
+      "p90_mm": 27.01114021771455,
       "unpredicted_fraction": 0.0
     },
     "L2": {
-      "median_mm": 111.61265447818201,
-      "p90_mm": 139.78108786635443,
+      "median_mm": 4.953829859500292,
+      "p90_mm": 25.4139863054116,
       "unpredicted_fraction": 0.0
     },
     "L3": {
-      "median_mm": 83.28819039198274,
-      "p90_mm": 125.44942727875804,
+      "median_mm": 3.3006554490573845,
+      "p90_mm": 29.097454788291557,
       "unpredicted_fraction": 0.0
     },
     "L4": {
-      "median_mm": 106.0434256802791,
-      "p90_mm": 167.78458370666962,
-      "unpredicted_fraction": 0.18556701030927836
+      "median_mm": 2.972010653657043,
+      "p90_mm": 24.302364011310598,
+      "unpredicted_fraction": 0.0
     },
     "L5": {
-      "median_mm": 94.63857530405235,
-      "p90_mm": 191.48469793056375,
+      "median_mm": 5.114013079462529,
+      "p90_mm": 14.023592238865476,
       "unpredicted_fraction": 0.0
     },
     "crest_left": {
-      "median_mm": 142.44241403426767,
-      "p90_mm": 179.28202663153976,
-      "unpredicted_fraction": 0.0
+      "median_mm": 3.455832977453712,
+      "p90_mm": 6.721698868963057,
+      "unpredicted_fraction": 0.3902439024390244
     },
     "crest_right": {
-      "median_mm": 134.2637747647971,
-      "p90_mm": 225.47111201635232,
-      "unpredicted_fraction": 0.0
+      "median_mm": 3.623157988196472,
+      "p90_mm": 9.317243692349297,
+      "unpredicted_fraction": 0.22727272727272727
     }
   },
   "angles": {
-    "angle_chord": 29.967392163151953,
-    "angle_ls": 23.73326532174693,
-    "angle_robust": 26.955163417540685
+    "angle_chord": 0.6803416137705575,
+    "angle_ls": 0.6387156507411931,
+    "angle_robust": 0.6797405650082146
   },
   "classification": {
     "crest_left": {
-      "accuracy": 0.6701030927835051,
+      "accuracy": 0.711340206185567,
       "confusion_matrix": [
         [
-          26,
-          15,
+          27,
+          14,
           0
         ],
         [
-          13,
-          39,
+          10,
+          42,
           0
         ],
         [
@@ -68,21 +68,21 @@
       ]
     },
     "crest_right": {
-      "accuracy": 0.5773195876288659,
+      "accuracy": 0.711340206185567,
       "confusion_matrix": [
         [
-          31,
+          34,
+          10,
+          0
+        ],
+        [
           13,
+          35,
           0
         ],
         [
-          23,
-          25,
-          0
-        ],
-        [
-          0,
-          5,
+          1,
+          4,
           0
         ]
       ]
@@ -108,7 +108,7 @@
       ]
     }
   },
-  "training_seconds": 785.881041765213,
+  "training_seconds": 530.1755030155182,
   "environment": {
     "python": "3.11.15 | packaged by conda-forge | (main, Jun 11 2026, 03:34:02) [GCC 14.3.0]",
     "torch": "2.8.0+cu128",

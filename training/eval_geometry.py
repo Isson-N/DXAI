@@ -46,6 +46,34 @@ def auc_of(y, score, groups, n_boot=500):
             "ci95": cluster_ci(y, score, groups, n_boot), "n": int(len(y)), "n_pos": int(y.sum())}
 
 
+def tuned_threshold_rule(y, score, folds):
+    """Порог признака подбирается по максимуму F1 ВНУТРИ обучающих фолдов и применяется к тесту.
+
+    Порог 5° из ТЗ метки не воспроизводит (F1 0,45–0,48): разметчик, видимо, смотрел не на
+    тот же угол. Здесь порог — часть модели, а не константа, и выбирается без теста.
+    """
+    decision = np.full(len(y), np.nan)
+    thresholds = []
+    for outer in sorted(set(folds)):
+        test = folds == outer
+        train = ~test & np.isfinite(y) & np.isfinite(score)
+        if train.sum() < 5 or len(np.unique(y[train])) < 2:
+            continue
+        candidates = np.unique(score[train])
+        best, best_f1 = None, -1.0
+        for t in candidates:
+            pred = (score[train] >= t).astype(int)
+            counts = rule_counts(y[train], pred)
+            if counts["f1"] > best_f1:
+                best, best_f1 = t, counts["f1"]
+        thresholds.append(float(best))
+        decision[test] = (score[test] >= best).astype(float)
+    good = np.isfinite(decision) & np.isfinite(y)
+    result = rule_counts(y[good], decision[good])
+    result["thresholds"] = [round(t, 2) for t in thresholds]
+    return result
+
+
 def rule_counts(y, decision):
     good = np.isfinite(y)
     y, decision = y[good].astype(int), decision[good].astype(int)
@@ -76,7 +104,7 @@ def design_matrix(df, suffix, variant="full"):
         names.append(f"{name}_missing")
     for name in (STATES if variant != "compact" else []):
         series = df[f"{name}_{suffix}"].astype(str)
-        for value in sorted(set(series) - {"nan", ""}):
+        for value in sorted({str(v) for v in series} - {"nan", ""}):
             cols.append((series == value).to_numpy(dtype=float))
             names.append(f"{name}={value}")
     x = np.column_stack(cols)
@@ -142,8 +170,10 @@ def main():
             }
             if target == "y_axis":
                 for name in ANGLES:
-                    decision = np.abs(df[f"{name}_{suffix}"].to_numpy(dtype=float)) > 5
-                    entry["rules"][f"{suffix}:{name}>5°"] = rule_counts(y, decision)
+                    score = np.abs(df[f"{name}_{suffix}"].to_numpy(dtype=float))
+                    entry["rules"][f"{suffix}:{name}>5°"] = rule_counts(y, score > 5)
+                    entry["rules"][f"{suffix}:{name}, порог подобран"] = tuned_threshold_rule(
+                        y, np.nan_to_num(score, nan=0.0), folds)
             else:
                 left = df[f"crest_left_state_{suffix}"].astype(str)
                 right = df[f"crest_right_state_{suffix}"].astype(str)
@@ -179,7 +209,9 @@ def main():
                 title = "все признаки" if variant == "full" else "компактно (3 признака)"
                 print(f"    логрег, {title}: AUC {item['auc']} {item['ci95']}")
         for name, counts in entry["rules"].items():
-            print(f"  правило {name}: TP={counts['tp']} FP={counts['fp']} FN={counts['fn']} F1={counts['f1']}")
+            extra = f" пороги {counts['thresholds']}" if "thresholds" in counts else ""
+            print(f"  правило {name}: TP={counts['tp']} FP={counts['fp']} FN={counts['fn']} "
+                  f"F1={counts['f1']}{extra}")
     print(f"\nОтчёт: {args.out}")
 
 

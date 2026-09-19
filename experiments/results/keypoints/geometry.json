@@ -1,0 +1,633 @@
+{
+ "n": 99,
+ "targets": {
+  "y_axis": {
+   "n_pos": 10,
+   "features": {
+    "true": {
+     "angle_chord": {
+      "auc": 0.79,
+      "ci95": [
+       0.623,
+       0.915
+      ],
+      "n": 97,
+      "n_pos": 10
+     },
+     "angle_ls": {
+      "auc": 0.792,
+      "ci95": [
+       0.643,
+       0.912
+      ],
+      "n": 97,
+      "n_pos": 10
+     },
+     "angle_robust": {
+      "auc": 0.809,
+      "ci95": [
+       0.671,
+       0.917
+      ],
+      "n": 97,
+      "n_pos": 10
+     },
+     "max_dev_chord": {
+      "auc": 0.503,
+      "ci95": [
+       0.31,
+       0.708
+      ],
+      "n": 97,
+      "n_pos": 10
+     },
+     "curvature": {
+      "auc": 0.578,
+      "ci95": [
+       0.388,
+       0.762
+      ],
+      "n": 97,
+      "n_pos": 10
+     },
+     "n_points": {
+      "auc": 0.584,
+      "ci95": [
+       0.55,
+       0.628
+      ],
+      "n": 99,
+      "n_pos": 10
+     },
+     "span_mm": {
+      "auc": 0.549,
+      "ci95": [
+       0.357,
+       0.759
+      ],
+      "n": 97,
+      "n_pos": 10
+     }
+    },
+    "pred": {
+     "angle_chord": {
+      "auc": 0.881,
+      "ci95": [
+       0.793,
+       0.955
+      ],
+      "n": 99,
+      "n_pos": 10
+     },
+     "angle_ls": {
+      "auc": 0.848,
+      "ci95": [
+       0.74,
+       0.941
+      ],
+      "n": 99,
+      "n_pos": 10
+     },
+     "angle_robust": {
+      "auc": 0.848,
+      "ci95": [
+       0.735,
+       0.944
+      ],
+      "n": 99,
+      "n_pos": 10
+     },
+     "max_dev_chord": {
+      "auc": 0.472,
+      "ci95": [
+       0.259,
+       0.681
+      ],
+      "n": 99,
+      "n_pos": 10
+     },
+     "curvature": {
+      "auc": 0.538,
+      "ci95": [
+       0.376,
+       0.692
+      ],
+      "n": 99,
+      "n_pos": 10
+     },
+     "n_points": {
+      "auc": 0.5,
+      "ci95": [
+       0.5,
+       0.5
+      ],
+      "n": 99,
+      "n_pos": 10
+     },
+     "span_mm": {
+      "auc": 0.599,
+      "ci95": [
+       0.402,
+       0.804
+      ],
+      "n": 99,
+      "n_pos": 10
+     }
+    }
+   },
+   "rules": {
+    "true:angle_chord>5°": {
+     "tp": 5,
+     "fp": 6,
+     "fn": 5,
+     "tn": 83,
+     "f1": 0.476
+    },
+    "true:angle_chord, порог подобран": {
+     "tp": 4,
+     "fp": 6,
+     "fn": 6,
+     "tn": 83,
+     "f1": 0.4,
+     "thresholds": [
+      5.21,
+      5.21,
+      5.21,
+      5.21,
+      5.28
+     ]
+    },
+    "true:angle_ls>5°": {
+     "tp": 5,
+     "fp": 8,
+     "fn": 5,
+     "tn": 81,
+     "f1": 0.435
+    },
+    "true:angle_ls, порог подобран": {
+     "tp": 4,
+     "fp": 12,
+     "fn": 6,
+     "tn": 77,
+     "f1": 0.308,
+     "thresholds": [
+      2.92,
+      5.15,
+      5.82,
+      5.15,
+      5.15
+     ]
+    },
+    "true:angle_robust>5°": {
+     "tp": 5,
+     "fp": 8,
+     "fn": 5,
+     "tn": 81,
+     "f1": 0.435
+    },
+    "true:angle_robust, порог подобран": {
+     "tp": 5,
+     "fp": 16,
+     "fn": 5,
+     "tn": 73,
+     "f1": 0.323,
+     "thresholds": [
+      3.06,
+      5.11,
+      3.06,
+      5.11,
+      5.11
+     ]
+    },
+    "pred:angle_chord>5°": {
+     "tp": 5,
+     "fp": 7,
+     "fn": 5,
+     "tn": 82,
+     "f1": 0.455
+    },
+    "pred:angle_chord, порог подобран": {
+     "tp": 6,
+     "fp": 13,
+     "fn": 4,
+     "tn": 76,
+     "f1": 0.414,
+     "thresholds": [
+      3.27,
+      5.35,
+      3.27,
+      5.35,
+      3.27
+     ]
+    },
+    "pred:angle_ls>5°": {
+     "tp": 5,
+     "fp": 6,
+     "fn": 5,
+     "tn": 83,
+     "f1": 0.476
+    },
+    "pred:angle_ls, порог подобран": {
+     "tp": 6,
+     "fp": 17,
+     "fn": 4,
+     "tn": 72,
+     "f1": 0.364,
+     "thresholds": [
+      3.19,
+      5.05,
+      3.19,
+      5.05,
+      3.19
+     ]
+    },
+    "pred:angle_robust>5°": {
+     "tp": 5,
+     "fp": 6,
+     "fn": 5,
+     "tn": 83,
+     "f1": 0.476
+    },
+    "pred:angle_robust, порог подобран": {
+     "tp": 6,
+     "fp": 16,
+     "fn": 4,
+     "tn": 73,
+     "f1": 0.375,
+     "thresholds": [
+      3.19,
+      5.05,
+      3.19,
+      5.05,
+      3.19
+     ]
+    }
+   },
+   "model": {
+    "true:full": {
+     "auc": 0.574,
+     "ci95": [
+      0.362,
+      0.765
+     ],
+     "n_features": 23,
+     "features": [
+      "angle_chord",
+      "angle_chord_missing",
+      "angle_ls",
+      "angle_ls_missing",
+      "angle_robust",
+      "angle_robust_missing",
+      "max_dev_chord",
+      "max_dev_chord_missing",
+      "curvature",
+      "curvature_missing",
+      "n_points",
+      "n_points_missing",
+      "span_mm",
+      "span_mm_missing",
+      "crest_left_state=in_frame",
+      "crest_left_state=out_of_frame",
+      "crest_left_state=partial",
+      "crest_right_state=in_frame",
+      "crest_right_state=out_of_frame",
+      "crest_right_state=partial",
+      "th12_half_visible=cannot",
+      "th12_half_visible=no",
+      "th12_half_visible=yes"
+     ]
+    },
+    "true:compact": {
+     "auc": 0.784,
+     "ci95": [
+      0.616,
+      0.907
+     ],
+     "n_features": 6,
+     "features": [
+      "angle_robust",
+      "angle_robust_missing",
+      "max_dev_chord",
+      "max_dev_chord_missing",
+      "n_points",
+      "n_points_missing"
+     ]
+    },
+    "pred:full": {
+     "auc": 0.788,
+     "ci95": [
+      0.611,
+      0.925
+     ],
+     "n_features": 23,
+     "features": [
+      "angle_chord",
+      "angle_chord_missing",
+      "angle_ls",
+      "angle_ls_missing",
+      "angle_robust",
+      "angle_robust_missing",
+      "max_dev_chord",
+      "max_dev_chord_missing",
+      "curvature",
+      "curvature_missing",
+      "n_points",
+      "n_points_missing",
+      "span_mm",
+      "span_mm_missing",
+      "crest_left_state=in_frame",
+      "crest_left_state=out_of_frame",
+      "crest_left_state=partial",
+      "crest_right_state=in_frame",
+      "crest_right_state=out_of_frame",
+      "crest_right_state=partial",
+      "th12_half_visible=cannot",
+      "th12_half_visible=no",
+      "th12_half_visible=yes"
+     ]
+    },
+    "pred:compact": {
+     "auc": 0.788,
+     "ci95": [
+      0.614,
+      0.918
+     ],
+     "n_features": 6,
+     "features": [
+      "angle_robust",
+      "angle_robust_missing",
+      "max_dev_chord",
+      "max_dev_chord_missing",
+      "n_points",
+      "n_points_missing"
+     ]
+    }
+   }
+  },
+  "y_pos": {
+   "n_pos": 6,
+   "features": {
+    "true": {
+     "angle_chord": {
+      "auc": 0.423,
+      "ci95": [
+       0.249,
+       0.594
+      ],
+      "n": 97,
+      "n_pos": 6
+     },
+     "angle_ls": {
+      "auc": 0.399,
+      "ci95": [
+       0.215,
+       0.582
+      ],
+      "n": 97,
+      "n_pos": 6
+     },
+     "angle_robust": {
+      "auc": 0.43,
+      "ci95": [
+       0.219,
+       0.642
+      ],
+      "n": 97,
+      "n_pos": 6
+     },
+     "max_dev_chord": {
+      "auc": 0.502,
+      "ci95": [
+       0.302,
+       0.68
+      ],
+      "n": 97,
+      "n_pos": 6
+     },
+     "curvature": {
+      "auc": 0.562,
+      "ci95": [
+       0.3,
+       0.761
+      ],
+      "n": 97,
+      "n_pos": 6
+     },
+     "n_points": {
+      "auc": 0.233,
+      "ci95": [
+       0.064,
+       0.459
+      ],
+      "n": 99,
+      "n_pos": 6
+     },
+     "span_mm": {
+      "auc": 0.249,
+      "ci95": [
+       0.015,
+       0.574
+      ],
+      "n": 97,
+      "n_pos": 6
+     }
+    },
+    "pred": {
+     "angle_chord": {
+      "auc": 0.425,
+      "ci95": [
+       0.219,
+       0.592
+      ],
+      "n": 99,
+      "n_pos": 6
+     },
+     "angle_ls": {
+      "auc": 0.391,
+      "ci95": [
+       0.242,
+       0.543
+      ],
+      "n": 99,
+      "n_pos": 6
+     },
+     "angle_robust": {
+      "auc": 0.364,
+      "ci95": [
+       0.207,
+       0.508
+      ],
+      "n": 99,
+      "n_pos": 6
+     },
+     "max_dev_chord": {
+      "auc": 0.242,
+      "ci95": [
+       0.063,
+       0.501
+      ],
+      "n": 99,
+      "n_pos": 6
+     },
+     "curvature": {
+      "auc": 0.384,
+      "ci95": [
+       0.239,
+       0.562
+      ],
+      "n": 99,
+      "n_pos": 6
+     },
+     "n_points": {
+      "auc": 0.5,
+      "ci95": [
+       0.5,
+       0.5
+      ],
+      "n": 99,
+      "n_pos": 6
+     },
+     "span_mm": {
+      "auc": 0.394,
+      "ci95": [
+       0.18,
+       0.64
+      ],
+      "n": 99,
+      "n_pos": 6
+     }
+    }
+   },
+   "rules": {
+    "true:гребень вне кадра": {
+     "tp": 5,
+     "fp": 0,
+     "fn": 1,
+     "tn": 93,
+     "f1": 0.909
+    },
+    "true:гребень вне кадра или Th12<половины": {
+     "tp": 5,
+     "fp": 4,
+     "fn": 1,
+     "tn": 89,
+     "f1": 0.667
+    },
+    "pred:гребень вне кадра": {
+     "tp": 5,
+     "fp": 0,
+     "fn": 1,
+     "tn": 93,
+     "f1": 0.909
+    },
+    "pred:гребень вне кадра или Th12<половины": {
+     "tp": 5,
+     "fp": 4,
+     "fn": 1,
+     "tn": 89,
+     "f1": 0.667
+    }
+   },
+   "model": {
+    "true:full": {
+     "auc": 0.905,
+     "ci95": [
+      0.763,
+      1.0
+     ],
+     "n_features": 23,
+     "features": [
+      "angle_chord",
+      "angle_chord_missing",
+      "angle_ls",
+      "angle_ls_missing",
+      "angle_robust",
+      "angle_robust_missing",
+      "max_dev_chord",
+      "max_dev_chord_missing",
+      "curvature",
+      "curvature_missing",
+      "n_points",
+      "n_points_missing",
+      "span_mm",
+      "span_mm_missing",
+      "crest_left_state=in_frame",
+      "crest_left_state=out_of_frame",
+      "crest_left_state=partial",
+      "crest_right_state=in_frame",
+      "crest_right_state=out_of_frame",
+      "crest_right_state=partial",
+      "th12_half_visible=cannot",
+      "th12_half_visible=no",
+      "th12_half_visible=yes"
+     ]
+    },
+    "true:compact": {
+     "auc": 0.719,
+     "ci95": [
+      0.41,
+      0.968
+     ],
+     "n_features": 6,
+     "features": [
+      "angle_robust",
+      "angle_robust_missing",
+      "max_dev_chord",
+      "max_dev_chord_missing",
+      "n_points",
+      "n_points_missing"
+     ]
+    },
+    "pred:full": {
+     "auc": 0.875,
+     "ci95": [
+      0.695,
+      1.0
+     ],
+     "n_features": 23,
+     "features": [
+      "angle_chord",
+      "angle_chord_missing",
+      "angle_ls",
+      "angle_ls_missing",
+      "angle_robust",
+      "angle_robust_missing",
+      "max_dev_chord",
+      "max_dev_chord_missing",
+      "curvature",
+      "curvature_missing",
+      "n_points",
+      "n_points_missing",
+      "span_mm",
+      "span_mm_missing",
+      "crest_left_state=in_frame",
+      "crest_left_state=out_of_frame",
+      "crest_left_state=partial",
+      "crest_right_state=in_frame",
+      "crest_right_state=out_of_frame",
+      "crest_right_state=partial",
+      "th12_half_visible=cannot",
+      "th12_half_visible=no",
+      "th12_half_visible=yes"
+     ]
+    },
+    "pred:compact": {
+     "auc": 0.652,
+     "ci95": [
+      0.397,
+      0.837
+     ],
+     "n_features": 6,
+     "features": [
+      "angle_robust",
+      "angle_robust_missing",
+      "max_dev_chord",
+      "max_dev_chord_missing",
+      "n_points",
+      "n_points_missing"
+     ]
+    }
+   }
+  }
+ }
+}

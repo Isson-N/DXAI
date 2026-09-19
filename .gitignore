@@ -40,3 +40,7 @@ data/annotations/
 # Предсказания на уровне снимков — производные от данных организатора
 experiments/results/*/oof.csv
 experiments/results/**/oof.csv
+
+# Пофайловые предсказания и веса: содержат UID исследований организатора / производны от его данных
+experiments/results/**/oof_*.csv
+models/
