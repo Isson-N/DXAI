@@ -284,7 +284,13 @@ def embeddings(encoder, images, args, masks=None, channels="gray"):
     return result
 
 
-def choose_threshold(y, probabilities):
+def choose_threshold(y, probabilities, min_specificity=0.0):
+    """Порог по максимуму F1; при min_specificity — только среди порогов с такой специфичностью.
+
+    Порог «по максимуму F1» на редких головах ставит предупреждение почти всем снимкам
+    (в аудите у B0 на hip_pos 102 ложных срабатывания на 114 отрицательных), поэтому
+    в сервисе выбор ограничивается снизу по специфичности.
+    """
     good = np.isfinite(y) & np.isfinite(probabilities)
     y, p = y[good].astype(int), probabilities[good]
     if not len(y):
@@ -296,6 +302,14 @@ def choose_threshold(y, probabilities):
     ends = np.r_[np.flatnonzero(p[:-1] != p[1:]), len(p) - 1]
     tp = np.cumsum(y)[ends]
     scores = 2 * tp / (ends + 1 + y.sum())
+    negatives = len(y) - y.sum()
+    if min_specificity > 0 and negatives:
+        specificity = 1 - (ends + 1 - tp) / negatives
+        allowed = np.flatnonzero(specificity >= min_specificity - 1e-12)
+        if len(allowed):
+            masked = np.full_like(scores, -1.0)
+            masked[allowed] = scores[allowed]
+            scores = masked
     best = np.flatnonzero(np.isclose(scores, scores.max(), rtol=0, atol=1e-12))
     thresholds = p[ends[best]]
     k = best[np.argmin(np.abs(thresholds - 0.5))]
@@ -336,7 +350,7 @@ def nested_logistic(x, y, folds, args, by_head=None):
                     tr = train[folds[train] != val_fold]
                     va = train[folds[train] == val_fold]
                     inner[va] = fit_logistic(xh, y[:, j], tr, va, c, args.seed)
-                threshold, score = choose_threshold(y[train, j], inner[train])
+                threshold, score = choose_threshold(y[train, j], inner[train], args.min_specificity)
                 if best is None or score > best[0] + 1e-12:
                     best = (score, c, threshold)
             _, c, threshold = best
@@ -450,7 +464,7 @@ def nested_cnn(template, images, y, folds, args, masks=None):
         selection[str(outer)] = {}
         thresholds = []
         for j, head in enumerate(HEADS):
-            threshold, score = choose_threshold(y[train, j], inner[train, j])
+            threshold, score = choose_threshold(y[train, j], inner[train, j], args.min_specificity)
             thresholds.append(threshold)
             selection[str(outer)][head] = {
                 "threshold": threshold, "inner_oof_f1": score,
@@ -578,6 +592,8 @@ def main():
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--size", type=int, default=384, help="длинная сторона после ресайза")
+    parser.add_argument("--min-specificity", type=float, default=0.0,
+                        help="нижняя граница специфичности при выборе порога (0 = только F1)")
     parser.add_argument("--top-fraction", type=float, default=0.4,
                         help="доля верхних строк для ветви «посторонние предметы»")
     parser.add_argument("--channels", choices=["gray", "physical"], default="physical",

@@ -142,6 +142,17 @@ def augment_image(x):
     return x.clamp(0, 1)
 
 
+GRIDS = {}
+
+
+def grid(size):
+    """Сетка координат heatmap'а: строилась заново на каждую точку и упиралась в CPU (GPU простаивала)."""
+    if size not in GRIDS:
+        GRIDS[size] = torch.meshgrid(torch.arange(size, dtype=torch.float32),
+                                     torch.arange(size, dtype=torch.float32), indexing="ij")
+    return GRIDS[size]
+
+
 class KeypointDataset(Dataset):
     def __init__(self, rows, annotations, image_cache, size, train=False):
         self.rows = rows.reset_index(drop=True)
@@ -172,9 +183,7 @@ class KeypointDataset(Dataset):
                 y = float(p["y"]) * scale + oy
                 true_xy[j] = torch.tensor([float(p["x"]), float(p["y"])])
                 hx, hy = x / 2.0, y / 2.0
-                yy, xx = torch.meshgrid(
-                    torch.arange(self.hm_size), torch.arange(self.hm_size), indexing="ij"
-                )
+                yy, xx = grid(self.hm_size)
                 g = torch.exp(-((xx - hx) ** 2 + (yy - hy) ** 2) / (2 * 2.5 ** 2))
                 target[j] = g
                 mask[j] = 1.0
