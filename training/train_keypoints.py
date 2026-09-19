@@ -257,14 +257,19 @@ def train_one(model, train_loader, val_loader, device, args):
             labels = batch["labels"].to(device)
             opt.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast(enabled=amp):
-                pred_hm, presence, pred_cls = model(image)
+                pred_hm, presence, regressed, pred_cls = model(image)
                 coords, spread = soft_argmax(pred_hm)
+                if args.head == "regress":
+                    coords, spread = regressed, torch.zeros_like(spread)
                 error = (coords - target_xy).abs().sum(-1)
                 point_loss = (error * mask).sum() / mask.sum().clamp_min(1)
                 # Штраф за размытость — только там, где точка есть.
                 spread_loss = (spread * mask).sum() / mask.sum().clamp_min(1)
-                kl = target_kl(pred_hm, target_xy, args.sigma / args.size)
-                map_loss = (kl * mask).sum() / mask.sum().clamp_min(1)
+                if args.head == "softargmax":
+                    kl = target_kl(pred_hm, target_xy, args.sigma / args.size)
+                    map_loss = (kl * mask).sum() / mask.sum().clamp_min(1)
+                else:
+                    map_loss = torch.zeros((), device=device)
                 presence_loss = F.binary_cross_entropy_with_logits(presence, mask)
                 cls_loss = 0
                 ncls = 0
@@ -289,8 +294,10 @@ def train_one(model, train_loader, val_loader, device, args):
                 image = batch["image"].to(device)
                 target_xy = batch["target_xy"].to(device)
                 mask = batch["mask"].to(device)
-                pred_hm, _, _ = model(image)
+                pred_hm, _, regressed, _ = model(image)
                 coords, _ = soft_argmax(pred_hm)
+                if args.head == "regress":
+                    coords = regressed
                 error = ((coords - target_xy).abs().sum(-1) * mask).sum() / mask.sum().clamp_min(1)
                 vals.append(float(error))
         score = float(np.mean(vals)) if vals else float("inf")
@@ -394,6 +401,8 @@ def main():
     ap.add_argument("--encoder-lr", type=float, default=1e-4)
     ap.add_argument("--sigma", type=float, default=5.0, help="σ целевого пятна, px входа")
     ap.add_argument("--map-weight", type=float, default=0.02, help="вес KL к целевому пятну")
+    ap.add_argument("--head", choices=["softargmax", "regress"], default="softargmax",
+                    help="regress — контрольный baseline: координаты прямо из global-pool")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     ap.add_argument("--workers", type=int, default=0)
@@ -456,8 +465,10 @@ def main():
 
         with torch.no_grad():
             for batch in te_loader:
-                hm, presence, logits = model(batch["image"].to(device))
+                hm, presence, regressed, logits = model(batch["image"].to(device))
                 coords, _ = soft_argmax(hm)
+                if args.head == "regress":
+                    coords = regressed
                 scores = torch.sigmoid(presence).cpu().numpy()
                 coords = coords.cpu().numpy()
                 cls_pred = logits.argmax(-1).cpu().numpy()

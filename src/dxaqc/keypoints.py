@@ -77,27 +77,24 @@ class SpineKeypointModel:
 
         canvas, scale, left, top = fit_canvas(normalize(image), self.size)
         with torch.inference_mode():
-            heatmaps, logits = self.net(canvas[None, None].expand(1, 3, -1, -1).to(self.device))
-        probability = torch.sigmoid(heatmaps)[0].cpu().numpy()
+            heatmaps, presence, _, logits = self.net(canvas[None, None].expand(1, 3, -1, -1).to(self.device))
+        # Координаты — soft-argmax по каналу (как при обучении), наличие точки — отдельная голова.
+        b, c, h, w = heatmaps.shape
+        flat = heatmaps.reshape(b, c, -1).softmax(-1).reshape(b, c, h, w)
+        grid_y = torch.linspace(0, 1, h).view(1, 1, h, 1)
+        grid_x = torch.linspace(0, 1, w).view(1, 1, 1, w)
+        ex = (flat * grid_x).sum(dim=(-1, -2))[0].cpu().numpy()
+        ey = (flat * grid_y).sum(dim=(-1, -2))[0].cpu().numpy()
+        present = torch.sigmoid(presence)[0].cpu().numpy()
         points: dict[str, tuple[float, float] | None] = {}
         scores: dict[str, float] = {}
         for index, name in enumerate(self.names):
-            plane = probability[index]
-            score = float(plane.max())
-            scores[name] = score
-            if score < self.threshold:
+            scores[name] = float(present[index])
+            if present[index] < self.threshold:
                 points[name] = None
                 continue
-            y, x = np.unravel_index(int(plane.argmax()), plane.shape)
-            y0, y1 = max(0, y - 2), min(plane.shape[0], y + 3)
-            x0, x1 = max(0, x - 2), min(plane.shape[1], x + 3)
-            patch = plane[y0:y1, x0:x1]
-            weight = patch.sum()
-            gy, gx = np.mgrid[y0:y1, x0:x1]
-            cy = (gy * patch).sum() / weight if weight else y
-            cx = (gx * patch).sum() / weight if weight else x
-            ratio = self.size / plane.shape[0]
-            points[name] = ((cx * ratio - left) / scale, (cy * ratio - top) / scale)
+            points[name] = ((ex[index] * self.size - left) / scale,
+                            (ey[index] * self.size - top) / scale)
         classes = logits[0].argmax(-1).cpu().numpy()
         names = ["crest_left", "crest_right", "th12_half_visible"]
         states = {key: self.states[key][int(classes[i])] for i, key in enumerate(names)}

@@ -47,6 +47,7 @@ class KeypointNet(nn.Module):
         self.d1 = ConvBlock(64 + ch[0], 32)
         self.out = nn.Conv2d(32, 8, 1)
         self.presence = nn.Linear(ch[4], 8)
+        self.regress = nn.Linear(ch[4], 16)  # контрольный вариант: координаты без пространственного выхода
         self.cls_left = nn.Linear(ch[4], 3)
         self.cls_right = nn.Linear(ch[4], 3)
         self.cls_th12 = nn.Linear(ch[4], 3)
@@ -64,5 +65,5 @@ class KeypointNet(nn.Module):
         z = self.d1(torch.cat([z, fs[-5]], 1))
         hm = self.out(z)
         pooled = F.adaptive_avg_pool2d(fs[-1], 1).flatten(1)
-        return (hm, self.presence(pooled),
+        return (hm, self.presence(pooled), self.regress(pooled).reshape(-1, 8, 2).sigmoid(),
                 torch.stack([self.cls_left(pooled), self.cls_right(pooled), self.cls_th12(pooled)], 1))
