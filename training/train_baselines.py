@@ -284,7 +284,7 @@ def embeddings(encoder, images, args, masks=None, channels="gray"):
     return result
 
 
-def choose_threshold(y, probabilities, min_specificity=0.0):
+def choose_threshold(y, probabilities, min_specificity=0.0, tolerance=0.0):
     """Порог по максимуму F1; при min_specificity — только среди порогов с такой специфичностью.
 
     Порог «по максимуму F1» на редких головах ставит предупреждение почти всем снимкам
@@ -310,6 +310,15 @@ def choose_threshold(y, probabilities, min_specificity=0.0):
             masked = np.full_like(scores, -1.0)
             masked[allowed] = scores[allowed]
             scores = masked
+    if tolerance > 0:
+        # Центр широкой почти оптимальной области вместо одиночного пика: при 6–36
+        # положительных пик F1 держится на одном-двух наблюдениях и на тесте не воспроизводится.
+        near = np.flatnonzero(scores >= scores.max() - tolerance)
+        if len(near):
+            runs = np.split(near, np.flatnonzero(np.diff(near) != 1) + 1)
+            widest = max(runs, key=len)
+            k = widest[len(widest) // 2]
+            return float(p[ends[k]]), float(scores[k])
     best = np.flatnonzero(np.isclose(scores, scores.max(), rtol=0, atol=1e-12))
     thresholds = p[ends[best]]
     k = best[np.argmin(np.abs(thresholds - 0.5))]
@@ -350,7 +359,7 @@ def nested_logistic(x, y, folds, args, by_head=None):
                     tr = train[folds[train] != val_fold]
                     va = train[folds[train] == val_fold]
                     inner[va] = fit_logistic(xh, y[:, j], tr, va, c, args.seed)
-                threshold, score = choose_threshold(y[train, j], inner[train], args.min_specificity)
+                threshold, score = choose_threshold(y[train, j], inner[train], args.min_specificity, args.threshold_tolerance)
                 if best is None or score > best[0] + 1e-12:
                     best = (score, c, threshold)
             _, c, threshold = best
@@ -488,7 +497,7 @@ def nested_cnn(template, images, y, folds, args, masks=None):
         selection[str(outer)] = {}
         thresholds = []
         for j, head in enumerate(HEADS):
-            threshold, score = choose_threshold(y[train, j], inner[train, j], args.min_specificity)
+            threshold, score = choose_threshold(y[train, j], inner[train, j], args.min_specificity, args.threshold_tolerance)
             thresholds.append(threshold)
             selection[str(outer)][head] = {
                 "threshold": threshold, "inner_oof_f1": score,
@@ -616,6 +625,8 @@ def main():
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--size", type=int, default=384, help="длинная сторона после ресайза")
+    parser.add_argument("--threshold-tolerance", type=float, default=0.0,
+                        help="допуск F1: порог берётся в центре широкой почти оптимальной области")
     parser.add_argument("--final-model", action="store_true",
                         help="дообучить B2 на всех снимках и сохранить веса для сервиса")
     parser.add_argument("--min-specificity", type=float, default=0.0,

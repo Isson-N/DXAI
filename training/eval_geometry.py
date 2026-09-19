@@ -57,18 +57,24 @@ def rule_counts(y, decision):
                                   ((y == 1) & (decision == 0)).sum(), 1)), 3)}
 
 
-def design_matrix(df, suffix):
+# Компактный набор выбран заранее, не по результатам: один робастный угол (МНК врёт при
+# сколиозе), отклонение от хорды как мера дуги и число найденных центров как индикатор качества.
+COMPACT = ["angle_robust", "max_dev_chord", "n_points"]
+
+
+def design_matrix(df, suffix, variant="full"):
     """Числовые признаки + состояния гребней и Th12 как индикаторы."""
     cols = []
     names = []
-    for name in NUMERIC:
+    numeric = COMPACT if variant == "compact" else NUMERIC
+    for name in numeric:
         col = df[f"{name}_{suffix}"].to_numpy(dtype=float)
         median = np.nanmedian(col) if np.isfinite(col).any() else 0.0
         cols.append(np.where(np.isfinite(col), col, median))
         names.append(name)
         cols.append((~np.isfinite(df[f"{name}_{suffix}"].to_numpy(dtype=float))).astype(float))
         names.append(f"{name}_missing")
-    for name in STATES:
+    for name in (STATES if variant != "compact" else []):
         series = df[f"{name}_{suffix}"].astype(str)
         for value in sorted(set(series) - {"nan", ""}):
             cols.append((series == value).to_numpy(dtype=float))
@@ -146,14 +152,16 @@ def main():
                 entry["rules"][f"{suffix}:гребень вне кадра"] = rule_counts(y, out_of_frame.to_numpy())
                 entry["rules"][f"{suffix}:гребень вне кадра или Th12<половины"] = rule_counts(
                     y, (out_of_frame | (th12 == "no")).to_numpy())
-            x, names = design_matrix(df, suffix)
-            p = cv_logistic(x, np.nan_to_num(y, nan=0.0), folds)
-            good = np.isfinite(p) & np.isfinite(y)
-            entry["model"][suffix] = {
-                "auc": round(float(roc_auc_score(y[good], p[good])), 3) if len(np.unique(y[good])) > 1 else None,
-                "ci95": cluster_ci(y[good].astype(int), p[good], groups[good]),
-                "n_features": len(names),
-            }
+            for variant in ("full", "compact"):
+                x, names = design_matrix(df, suffix, variant)
+                p = cv_logistic(x, np.nan_to_num(y, nan=0.0), folds)
+                good = np.isfinite(p) & np.isfinite(y)
+                entry["model"][f"{suffix}:{variant}"] = {
+                    "auc": round(float(roc_auc_score(y[good], p[good])), 3)
+                           if len(np.unique(y[good])) > 1 else None,
+                    "ci95": cluster_ci(y[good].astype(int), p[good], groups[good]),
+                    "n_features": len(names), "features": names,
+                }
         report["targets"][target] = entry
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
@@ -166,8 +174,10 @@ def main():
             best.sort(reverse=True)
             source = "ручная разметка" if suffix == "true" else "модель точек"
             print(f"  {source}: лучший признак {best[0][1]} AUC {best[0][0]}" if best else f"  {source}: нет")
-            print(f"    логрег на всех признаках: AUC {entry['model'][suffix]['auc']} "
-                  f"{entry['model'][suffix]['ci95']}")
+            for variant in ("full", "compact"):
+                item = entry["model"][f"{suffix}:{variant}"]
+                title = "все признаки" if variant == "full" else "компактно (3 признака)"
+                print(f"    логрег, {title}: AUC {item['auc']} {item['ci95']}")
         for name, counts in entry["rules"].items():
             print(f"  правило {name}: TP={counts['tp']} FP={counts['fp']} FN={counts['fn']} F1={counts['f1']}")
     print(f"\nОтчёт: {args.out}")
