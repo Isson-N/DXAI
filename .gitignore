@@ -36,3 +36,7 @@ data/*.txt
 
 # Ручная разметка (производная от данных организатора)
 data/annotations/
+
+# Предсказания на уровне снимков — производные от данных организатора
+experiments/results/*/oof.csv
+experiments/results/**/oof.csv
