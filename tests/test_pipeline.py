@@ -69,7 +69,7 @@ def test_zip_input_with_cyrillic_names(study_dir, tmp_path):
 @pytest.mark.parametrize("suffix", [".csv", ".xlsx"])
 def test_cli_writes_organizer_format(study_dir, tmp_path, suffix):
     out = tmp_path / "out" / f"results{suffix}"
-    assert main(["predict", "--input", str(study_dir), "--output", str(out)]) == 0
+    assert main(["predict", "--stub", "--input", str(study_dir), "--output", str(out)]) == 0
     if suffix == ".csv":
         with out.open(encoding="utf-8") as f:
             header = next(csv.reader(f))
@@ -80,7 +80,7 @@ def test_cli_writes_organizer_format(study_dir, tmp_path, suffix):
 
 
 def test_cli_missing_input(tmp_path):
-    assert main(["predict", "--input", str(tmp_path / "nope"), "--output", str(tmp_path / "r.csv")]) == 2
+    assert main(["predict", "--stub", "--input", str(tmp_path / "nope"), "--output", str(tmp_path / "r.csv")]) == 2
 
 
 @pytest.mark.skipif(not (ROOT / "data" / "test").exists(), reason="нет данных организатора")

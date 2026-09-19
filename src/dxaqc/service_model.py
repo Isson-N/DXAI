@@ -113,15 +113,21 @@ def load(models_dir: str | Path, device: str = "cpu") -> ServiceModel:
     model = ServiceModel()
     keypoints_path = directory / "spine_keypoints.pt"
     if keypoints_path.exists():
-        from .keypoints import SpineKeypointModel
-        model.keypoints = SpineKeypointModel(keypoints_path, device)
+        try:
+            from .keypoints import SpineKeypointModel
+            model.keypoints = SpineKeypointModel(keypoints_path, device)
+        except ImportError as exc:
+            model.notes.append(f"модель точек не загружена: {exc}")
     else:
         model.notes.append(f"нет файла {keypoints_path.name}")
     cnn_path = directory / "quality_cnn.pt"
     if cnn_path.exists():
-        from .cnn import QualityCNN
-        model.cnn = QualityCNN(cnn_path, device)
-        model.thresholds = dict(model.cnn.thresholds)
+        try:
+            from .cnn import QualityCNN
+            model.cnn = QualityCNN(cnn_path, device)
+            model.thresholds = dict(model.cnn.thresholds)
+        except ImportError as exc:
+            model.notes.append(f"CNN не загружена: {exc}")
     else:
         model.notes.append(f"нет файла {cnn_path.name}")
     return model
