@@ -433,6 +433,7 @@ def main():
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--point-threshold", type=float, default=0.2)
     ap.add_argument("--only-fold", type=int, default=None, help="только один внешний фолд (дымовой тест)")
+    ap.add_argument("--final-model", default=None, help="куда сохранить модель для сервиса")
     ap.add_argument("--heatmap-weight", type=float, default=100.0)
     ap.add_argument("--class-weight", type=float, default=1.0)
     ap.add_argument("--pretrained", dest="pretrained", action="store_true", default=True)
@@ -552,6 +553,23 @@ def main():
                         pred_state = STATE_NAMES[k][int(cls_pred[bi, ["crest_left", "crest_right", "th12_half_visible"].index(k)])]
                         if true_state in STATE_NAMES[k]:
                             conf[k][STATE_NAMES[k].index(true_state), STATE_NAMES[k].index(pred_state)] += 1
+
+    # Финальная модель для сервиса: учится на всех размеченных снимках (фолд 0 — валидация).
+    if args.final_model:
+        val = rows[rows.fold == rows.fold.min()]
+        train = rows[rows.fold != rows.fold.min()]
+        tr_loader = DataLoader(KeypointDataset(train, annotations, image_cache, args.size, True),
+                               batch_size=8, shuffle=True, num_workers=args.workers)
+        va_loader = DataLoader(KeypointDataset(val, annotations, image_cache, args.size, False),
+                               batch_size=8, shuffle=False, num_workers=args.workers)
+        model = KeypointNet(args.pretrained).to(device)
+        model = train_one(model, tr_loader, va_loader, device, args)
+        target = Path(args.final_model)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        torch.save({"state_dict": {k: v.cpu() for k, v in model.state_dict().items()},
+                    "size": args.size, "points": POINTS, "states": STATE_NAMES,
+                    "point_threshold": args.point_threshold, "seed": args.seed}, target)
+        print(f"Финальная модель: {target}")
 
     pd.DataFrame(oof_points).to_csv(out_dir / "oof_points.csv", index=False)
     pd.DataFrame(oof_features).to_csv(out_dir / "oof_features.csv", index=False)

@@ -385,7 +385,7 @@ def cnn_loss(outputs, targets):
     return loss + (losses * mask).sum() / mask.sum().clamp_min(1)
 
 
-def train_cnn(template, images, y, train, test, args, seed, masks=None):
+def train_cnn(template, images, y, train, test, args, seed, masks=None, return_model=False):
     seed = int(seed)  # numpy int64 не принимается random.seed и torch.Generator
     seed_all(seed)
     model = MultiHeadCNN(copy.deepcopy(template)).to(args.device)
@@ -431,6 +431,12 @@ def train_cnn(template, images, y, train, test, args, seed, masks=None):
             scaler.update()
         scheduler.step()
     model.eval()
+    if return_model:
+        state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+        del model, optimizer, scheduler, scaler, loader
+        if amp:
+            torch.cuda.empty_cache()
+        return state
     predictions = []
     with torch.inference_mode():
         for x in make_loader(images, test, args, seed, masks=masks, channels=args.channels):
@@ -446,6 +452,24 @@ def train_cnn(template, images, y, train, test, args, seed, masks=None):
     if amp:
         torch.cuda.empty_cache()
     return result
+
+
+def save_final_cnn(template, images, masks, y, path, args, selection):
+    """Модель для сервиса: обучение на всех снимках, пороги — средние по внешним фолдам.
+
+    Во внешнем CV каждая модель видела только 4/5 данных; в сервисе нужна одна модель
+    на всех данных, а пороги берутся из уже выполненной валидации (заново их выбирать не на чем).
+    """
+    thresholds = {}
+    for head in HEADS:
+        values = [selection[key][head]["threshold"] for key in selection if head in selection[key]]
+        thresholds[head] = float(np.median(values)) if values else 0.5
+    everything = np.arange(len(y))
+    model_state = train_cnn(template, images, y, everything, everything[:1], args,
+                            args.seed + 777, masks, return_model=True)
+    torch.save({"state_dict": model_state, "thresholds": thresholds, "heads": HEADS,
+                "size": args.size, "channels": args.channels, "seed": args.seed}, path)
+    print(f"  Финальная модель сервиса: {path}", flush=True)
 
 
 def nested_cnn(template, images, y, folds, args, masks=None):
@@ -592,6 +616,8 @@ def main():
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--size", type=int, default=384, help="длинная сторона после ресайза")
+    parser.add_argument("--final-model", action="store_true",
+                        help="дообучить B2 на всех снимках и сохранить веса для сервиса")
     parser.add_argument("--min-specificity", type=float, default=0.0,
                         help="нижняя граница специфичности при выборе порога (0 = только F1)")
     parser.add_argument("--top-fraction", type=float, default=0.4,
@@ -662,6 +688,8 @@ def main():
             p[~applicable, j], pred[~applicable, j] = np.nan, np.nan
         folder = out / name
         folder.mkdir(parents=True, exist_ok=True)
+        if args.final_model and name == "b2":
+            save_final_cnn(template, images, masks, y, folder / "final_model.pt", args, selection)
         oof = df[["sop_uid", "study", "study_n", "region", "fold"]].copy()
         for j, head in enumerate(HEADS):
             oof[head + "_prob"] = p[:, j]
