@@ -4,6 +4,7 @@ import json
 import math
 import os
 import random
+import sys
 import time
 import warnings
 from pathlib import Path
@@ -17,6 +18,9 @@ from torch.utils.data import Dataset, DataLoader
 
 import pydicom
 import timm
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from dxaqc.nets import ConvBlock, KeypointNet  # noqa: E402
 
 
 POINTS = ["Th12", "L1", "L2", "L3", "L4", "L5", "crest_left", "crest_right"]
@@ -203,60 +207,6 @@ class KeypointDataset(Dataset):
             "true_xy": true_xy,
             "uid": uid,
         }
-
-
-class ConvBlock(nn.Module):
-    def __init__(self, cin, cout):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(cin, cout, 3, padding=1, bias=False),
-            nn.BatchNorm2d(cout),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(cout, cout, 3, padding=1, bias=False),
-            nn.BatchNorm2d(cout),
-            nn.ReLU(inplace=True),
-        )
-
-    def forward(self, x):
-        return self.net(x)
-
-
-class KeypointNet(nn.Module):
-    def __init__(self, pretrained=True):
-        super().__init__()
-        try:
-            self.encoder = timm.create_model(
-                "resnet18", features_only=True, pretrained=pretrained, in_chans=3
-            )
-        except Exception as e:
-            warnings.warn(f"Не удалось загрузить веса timm: {e}")
-            self.encoder = timm.create_model(
-                "resnet18", features_only=True, pretrained=False, in_chans=3
-            )
-        ch = self.encoder.feature_info.channels()
-        self.d4 = ConvBlock(ch[4] + ch[3], 256)
-        self.d3 = ConvBlock(256 + ch[2], 128)
-        self.d2 = ConvBlock(128 + ch[1], 64)
-        self.d1 = ConvBlock(64 + ch[0], 32)
-        self.out = nn.Conv2d(32, 8, 1)
-        self.cls_left = nn.Linear(ch[4], 3)
-        self.cls_right = nn.Linear(ch[4], 3)
-        self.cls_th12 = nn.Linear(ch[4], 3)
-
-    def forward(self, x):
-        fs = self.encoder(x)
-        z = fs[-1]
-        z = F.interpolate(z, size=fs[-2].shape[-2:], mode="bilinear", align_corners=False)
-        z = self.d4(torch.cat([z, fs[-2]], 1))
-        z = F.interpolate(z, size=fs[-3].shape[-2:], mode="bilinear", align_corners=False)
-        z = self.d3(torch.cat([z, fs[-3]], 1))
-        z = F.interpolate(z, size=fs[-4].shape[-2:], mode="bilinear", align_corners=False)
-        z = self.d2(torch.cat([z, fs[-4]], 1))
-        z = F.interpolate(z, size=fs[-5].shape[-2:], mode="bilinear", align_corners=False)
-        z = self.d1(torch.cat([z, fs[-5]], 1))
-        hm = self.out(z)
-        pooled = F.adaptive_avg_pool2d(fs[-1], 1).flatten(1)
-        return hm, torch.stack([self.cls_left(pooled), self.cls_right(pooled), self.cls_th12(pooled)], 1)
 
 
 def decode_heatmaps(hm, threshold):
