@@ -131,8 +131,16 @@ def load_index(args, root):
     return df, y
 
 
-def load_images(df, root):
-    images = np.zeros((len(df), 256, 256), dtype=np.float32)
+def load_images(df, root, size=384, top_fraction=0.4):
+    """Изображения, маска валидной области (не паддинг), верхняя полоса и простые признаки.
+
+    Ресайз до 256 срезал тонкие дуги (косточки бюстгальтера шириной 1–3 px) — длинная
+    сторона по умолчанию 384. Маска нужна, чтобы сеть отличала настоящий край кадра
+    от нулевого паддинга: «обрезанное поле сканирования» — это метка по краям.
+    """
+    images = np.zeros((len(df), size, size), dtype=np.float32)
+    masks = np.zeros((len(df), size, size), dtype=np.float32)
+    tops = np.zeros((len(df), size, size), dtype=np.float32)
     features = np.empty((len(df), 14), dtype=np.float32)
     for i, row in df.iterrows():
         ds = pydicom.dcmread(resolve(root, row["path"]))
@@ -162,21 +170,38 @@ def load_images(df, root):
             image.std(), p5, p25, p75, p95, cx, cy,
             np.mean(image > 0.8 * image.max()),
         ]
-        scale = 256 / max(h, w)
-        nh, nw = max(1, round(h * scale)), max(1, round(w * scale))
-        resized = F.interpolate(
-            torch.from_numpy(image)[None, None], size=(nh, nw),
-            mode="bilinear", align_corners=False,
-        )[0, 0].numpy()
-        top, left = (256 - nh) // 2, (256 - nw) // 2
-        images[i, top:top + nh, left:left + nw] = resized
-    return images, features
+        images[i], masks[i] = fit_canvas(image, size)
+        # Верхняя полоса в собственном масштабе: там косточки бюстгальтера и застёжки.
+        strip = image[:max(1, int(round(h * top_fraction)))]
+        tops[i], _ = fit_canvas(strip, size)
+    return images, masks, tops, features
+
+
+def fit_canvas(image, size):
+    """Вписывает изображение в квадрат size×size с сохранением пропорций; вторым — маска."""
+    h, w = image.shape
+    scale = size / max(h, w)
+    nh, nw = max(1, round(h * scale)), max(1, round(w * scale))
+    resized = F.interpolate(
+        torch.from_numpy(np.ascontiguousarray(image))[None, None], size=(nh, nw),
+        mode="bilinear", align_corners=False,
+    )[0, 0].numpy()
+    canvas = np.zeros((size, size), dtype=np.float32)
+    mask = np.zeros((size, size), dtype=np.float32)
+    top, left = (size - nh) // 2, (size - nw) // 2
+    canvas[top:top + nh, left:left + nw] = resized
+    mask[top:top + nh, left:left + nw] = 1.0
+    return canvas, mask
+
+
+LAPLACIAN = torch.tensor([[0.0, 1.0, 0.0], [1.0, -4.0, 1.0], [0.0, 1.0, 0.0]])[None, None]
 
 
 class ImageDataset(Dataset):
-    def __init__(self, images, indices, targets=None, augment=False):
+    def __init__(self, images, indices, targets=None, augment=False, masks=None, channels="gray"):
         self.images, self.indices = images, np.asarray(indices)
         self.targets, self.augment = targets, augment
+        self.masks, self.channels = masks, channels
 
     def __len__(self):
         return len(self.indices)
@@ -201,20 +226,27 @@ class ImageDataset(Dataset):
                 kernel = (kernel[:, None] * kernel[None, :])[None, None]
                 x = F.conv2d(x[None], kernel, padding=2)[0]
             x = x.clamp(0, 1) * support
-        x = (x.expand(3, -1, -1) - MEAN) / STD
+        if self.channels == "physical":
+            # Канал высоких частот подчёркивает тонкие дуги, канал маски отделяет
+            # настоящий край кадра от паддинга; статистики ImageNet тут не применимы.
+            high = F.conv2d(x[None], LAPLACIAN, padding=1)[0]
+            mask = torch.from_numpy(self.masks[i])[None] if self.masks is not None else torch.ones_like(x)
+            x = torch.cat([(x - 0.485) / 0.229, (high * 5).clamp(-3, 3), mask - 0.5], dim=0)
+        else:
+            x = (x.expand(3, -1, -1) - MEAN) / STD
         if self.targets is None:
             return x
         return x, torch.from_numpy(self.targets[i])
 
 
-def make_loader(images, indices, args, seed, targets=None, train=False):
+def make_loader(images, indices, args, seed, targets=None, train=False, masks=None, channels="gray"):
     # При spawn не передаём рабочим процессам копии всего кэша.
     import multiprocessing as mp
     workers = args.workers
     if workers and mp.get_start_method() != "fork":
         workers = 0
     return DataLoader(
-        ImageDataset(images, indices, targets, train),
+        ImageDataset(images, indices, targets, train, masks, channels),
         batch_size=16, shuffle=train, num_workers=workers,
         pin_memory=args.device == "cuda", worker_init_fn=worker_seed,
         generator=torch.Generator().manual_seed(seed), drop_last=False,
@@ -236,12 +268,13 @@ def create_encoder(pretrained):
         )
 
 
-def embeddings(encoder, images, args):
+def embeddings(encoder, images, args, masks=None, channels="gray"):
     encoder = encoder.to(args.device).eval()
     result = np.empty((len(images), encoder.num_features), dtype=np.float32)
     offset = 0
     with torch.inference_mode():
-        for x in make_loader(images, np.arange(len(images)), args, args.seed):
+        for x in make_loader(images, np.arange(len(images)), args, args.seed,
+                             masks=masks, channels=channels):
             z = encoder(x.to(args.device, non_blocking=True)).float().cpu().numpy()
             result[offset:offset + len(z)] = z
             offset += len(z)
@@ -286,7 +319,8 @@ def fit_logistic(x, y, train, test, c, seed):
     return model.predict_proba(x[test])[:, 1]
 
 
-def nested_logistic(x, y, folds, args):
+def nested_logistic(x, y, folds, args, by_head=None):
+    """by_head: голова → своя матрица признаков (остальные головы берут общую x)."""
     probabilities = np.full(y.shape, np.nan, dtype=np.float64)
     decisions = np.full(y.shape, np.nan)
     selection = {}
@@ -294,18 +328,19 @@ def nested_logistic(x, y, folds, args):
         train, test = np.flatnonzero(folds != outer), np.flatnonzero(folds == outer)
         selection[str(outer)] = {}
         for j, head in enumerate(HEADS):
+            xh = (by_head or {}).get(head, x)
             best = None
             for c in CS:
                 inner = np.full(len(y), np.nan)
                 for val_fold in sorted(set(folds[train])):
                     tr = train[folds[train] != val_fold]
                     va = train[folds[train] == val_fold]
-                    inner[va] = fit_logistic(x, y[:, j], tr, va, c, args.seed)
+                    inner[va] = fit_logistic(xh, y[:, j], tr, va, c, args.seed)
                 threshold, score = choose_threshold(y[train, j], inner[train])
                 if best is None or score > best[0] + 1e-12:
                     best = (score, c, threshold)
             _, c, threshold = best
-            p = fit_logistic(x, y[:, j], train, test, c, args.seed)
+            p = fit_logistic(xh, y[:, j], train, test, c, args.seed)
             probabilities[test, j], decisions[test, j] = p, p >= threshold
             selection[str(outer)][head] = {
                 "threshold": threshold, "C": c, "inner_oof_f1": best[0],
@@ -336,7 +371,7 @@ def cnn_loss(outputs, targets):
     return loss + (losses * mask).sum() / mask.sum().clamp_min(1)
 
 
-def train_cnn(template, images, y, train, test, args, seed):
+def train_cnn(template, images, y, train, test, args, seed, masks=None):
     seed = int(seed)  # numpy int64 не принимается random.seed и torch.Generator
     seed_all(seed)
     model = MultiHeadCNN(copy.deepcopy(template)).to(args.device)
@@ -347,7 +382,8 @@ def train_cnn(template, images, y, train, test, args, seed):
         scaler = torch.amp.GradScaler("cuda", enabled=amp)
     except (AttributeError, TypeError):
         scaler = torch.cuda.amp.GradScaler(enabled=amp)
-    loader = make_loader(images, train, args, seed, targets=y, train=True)
+    loader = make_loader(images, train, args, seed, targets=y, train=True,
+                         masks=masks, channels=args.channels)
     for _ in range(args.epochs):
         model.train()
         for x, target in loader:
@@ -383,7 +419,7 @@ def train_cnn(template, images, y, train, test, args, seed):
     model.eval()
     predictions = []
     with torch.inference_mode():
-        for x in make_loader(images, test, args, seed):
+        for x in make_loader(images, test, args, seed, masks=masks, channels=args.channels):
             with torch.autocast(device_type=args.device, enabled=amp):
                 region, quality = model(x.to(args.device, non_blocking=True))
             # Две независимые BCE-компоненты региона нормируются через softmax.
@@ -398,7 +434,7 @@ def train_cnn(template, images, y, train, test, args, seed):
     return result
 
 
-def nested_cnn(template, images, y, folds, args):
+def nested_cnn(template, images, y, folds, args, masks=None):
     probabilities = np.full(y.shape, np.nan, dtype=np.float64)
     decisions = np.full(y.shape, np.nan)
     selection = {}
@@ -408,7 +444,7 @@ def nested_cnn(template, images, y, folds, args):
         for val_fold in sorted(set(folds[train])):
             tr, va = train[folds[train] != val_fold], train[folds[train] == val_fold]
             inner[va] = train_cnn(
-                template, images, y, tr, va, args, args.seed + 100 * outer + val_fold
+                template, images, y, tr, va, args, args.seed + 100 * outer + val_fold, masks
             )
             print(f"  Внешний {outer}, внутренний {val_fold}: готово", flush=True)
         selection[str(outer)] = {}
@@ -420,7 +456,7 @@ def nested_cnn(template, images, y, folds, args):
                 "threshold": threshold, "inner_oof_f1": score,
             }
         probabilities[test] = train_cnn(
-            template, images, y, train, test, args, args.seed + 100 * outer + 99
+            template, images, y, train, test, args, args.seed + 100 * outer + 99, masks
         )
         decisions[test] = probabilities[test] >= np.asarray(thresholds)
         print(f"  Внешний фолд {outer}: готово", flush=True)
@@ -541,6 +577,14 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--workers", type=int, default=0)
+    parser.add_argument("--size", type=int, default=384, help="длинная сторона после ресайза")
+    parser.add_argument("--top-fraction", type=float, default=0.4,
+                        help="доля верхних строк для ветви «посторонние предметы»")
+    parser.add_argument("--channels", choices=["gray", "physical"], default="physical",
+                        help="physical: снимок + лапласиан + маска валидной области (для B2)")
+    parser.add_argument("--foreign-branch", dest="foreign_branch", action="store_true", default=True,
+                        help="B1: для головы «предметы» добавить эмбеддинг верхней полосы")
+    parser.add_argument("--no-foreign-branch", dest="foreign_branch", action="store_false")
     parser.add_argument("--pretrained", dest="pretrained", action="store_true", default=True)
     parser.add_argument("--no-pretrained", dest="pretrained", action="store_false")
     args = parser.parse_args()
@@ -559,7 +603,7 @@ def main():
     seed_all(args.seed)
     df, y = load_index(args, root)
     started = time.perf_counter()
-    images, simple_features = load_images(df, root)
+    images, masks, tops, simple_features = load_images(df, root, args.size, args.top_fraction)
     preprocessing_seconds = time.perf_counter() - started
     folds = df["fold"].to_numpy()
     template, encoder_seconds, pretrained_loaded = None, 0.0, False
@@ -584,10 +628,15 @@ def main():
             p, pred, selection = nested_logistic(simple_features, y, folds, args)
         elif name == "b1":
             x = embeddings(template, images, args)
-            p, pred, selection = nested_logistic(x, y, folds, args)
-            del x
+            by_head = {}
+            if args.foreign_branch:
+                # Верхняя полоса в своём масштабе: косточки бюстгальтера видны только там.
+                xt = embeddings(template, tops, args)
+                by_head["spine_foreign"] = np.concatenate([x, xt], axis=1)
+            p, pred, selection = nested_logistic(x, y, folds, args, by_head)
+            del x, by_head
         else:
-            p, pred, selection = nested_cnn(template, images, y, folds, args)
+            p, pred, selection = nested_cnn(template, images, y, folds, args, masks)
         training_seconds = time.perf_counter() - started
         if not np.isfinite(p).all():
             raise RuntimeError(f"{name}: не все внешние предсказания заполнены")
