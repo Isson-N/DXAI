@@ -67,3 +67,34 @@ class KeypointNet(nn.Module):
         pooled = F.adaptive_avg_pool2d(fs[-1], 1).flatten(1)
         return (hm, self.presence(pooled), self.regress(pooled).reshape(-1, 8, 2).sigmoid(),
                 torch.stack([self.cls_left(pooled), self.cls_right(pooled), self.cls_th12(pooled)], 1))
+
+
+class MultiHeadCNN(nn.Module):
+    def __init__(self, encoder, n_violations=7):
+        super().__init__()
+        self.encoder = encoder
+        self.region = nn.Linear(encoder.num_features, 2)
+        self.quality = nn.Linear(encoder.num_features, n_violations)
+
+    def forward(self, x):
+        z = self.encoder(x)
+        return self.region(z), self.quality(z)
+
+
+def hip_side(pixels) -> str:
+    """Сторона бедра по содержимому: центр масс верхней трети против нижней.
+
+    Тег стороны в выгрузке пуст, а обучение видело все бёдра приведёнными к правому,
+    поэтому сторона определяется из пикселей — одинаково на обучении и в сервисе.
+    """
+    import numpy as np
+
+    a = np.asarray(pixels, dtype=float)
+    h, w = a.shape
+    xs = np.arange(w)
+
+    def centre(part):
+        column = part.sum(0)
+        return float((column * xs).sum() / max(column.sum(), 1e-6))
+
+    return "R" if centre(a[: h // 3]) - centre(a[2 * h // 3:]) > 0 else "L"

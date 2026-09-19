@@ -7,6 +7,7 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 import argparse
 import copy
+import sys
 import importlib.metadata
 import json
 import random
@@ -25,6 +26,9 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, Dataset
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from dxaqc.nets import MultiHeadCNN  # noqa: E402
 
 
 HEADS = [
@@ -372,18 +376,6 @@ def nested_logistic(x, y, folds, args, by_head=None):
     return probabilities, decisions, selection
 
 
-class MultiHeadCNN(nn.Module):
-    def __init__(self, encoder):
-        super().__init__()
-        self.encoder = encoder
-        self.region = nn.Linear(encoder.num_features, 2)
-        self.quality = nn.Linear(encoder.num_features, len(HEADS) - 1)
-
-    def forward(self, x):
-        z = self.encoder(x)
-        return self.region(z), self.quality(z)
-
-
 def cnn_loss(outputs, targets):
     region, quality = outputs
     region_target = F.one_hot(targets[:, 0].long(), 2).float()
@@ -397,7 +389,7 @@ def cnn_loss(outputs, targets):
 def train_cnn(template, images, y, train, test, args, seed, masks=None, return_model=False):
     seed = int(seed)  # numpy int64 не принимается random.seed и torch.Generator
     seed_all(seed)
-    model = MultiHeadCNN(copy.deepcopy(template)).to(args.device)
+    model = MultiHeadCNN(copy.deepcopy(template), len(HEADS) - 1).to(args.device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
     amp = args.device == "cuda"
