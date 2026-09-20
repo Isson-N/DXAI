@@ -334,6 +334,19 @@ class Application:
         self.token = secrets.token_urlsafe(32)
         self.filename = Path(args.out) / f"hip_points_{args.annotator}.json"
         self.rows = select_images(args.index)
+        part = str(getattr(args, "part", "all"))
+        if part != "all":
+            # Делим по исследованиям: иначе левое и правое бедро одного
+            # пациента уедут к разным разметчикам и сравнение пары превратится
+            # в сравнение двух людей.
+            from annotation_split import describe as describe_split, split_studies
+            all_studies = [r["study"] for r in self.rows]
+            summary = describe_split(all_studies, part, overlap=6, salt="hip")
+            mine = split_studies(all_studies, part, overlap=6, salt="hip")
+            self.rows = [r for r in self.rows if r["study"] in mine]
+            positives = sum(1 for r in self.rows if r["y_pos"] == 1)
+            print(f"{summary}; снимков {len(self.rows)}, "
+                  f"из них положительных {positives}", flush=True)
         self.items = {r["uid"]: r for r in self.rows}
         self.order = make_order(self.rows)
         self.pngs = {}
@@ -1259,6 +1272,9 @@ def main():
     parser.add_argument("--out", default="data/annotations")
     parser.add_argument("--port", type=int, default=8767)
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--part", default="all", choices=("1", "2", "all"),
+                        help="часть работы: 1 или 2 (делится по исследованиям, "
+                             "6 общих для оценки согласия), all — всё")
     parser.add_argument("--report", metavar="JSON")
     args = parser.parse_args()
 

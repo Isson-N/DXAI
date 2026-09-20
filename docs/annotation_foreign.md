@@ -7,9 +7,15 @@
 
 ```bash
 cd ~/projects/dxa-quality-ai
-.venv/bin/python tools/foreign_annotator.py \
-    --index data/index/images.csv --root . --annotator <имя_латиницей>
+.venv/bin/python tools/foreign_annotator.py --index data/index/images.csv --root . \
+    --annotator isson --part 1 --scores experiments/results/b2/oof.csv
+.venv/bin/python tools/foreign_annotator.py --index data/index/images.csv --root . \
+    --annotator den   --part 2 --scores experiments/results/b2/oof.csv
 ```
+
+`--part` делит работу по исследованиям, 10 снимков общие (согласие разметчиков).
+`--scores` поднимает наверх все положительные и 40 отрицательных, где модель
+ошибается чаще всего: если бросить на середине, ценное уже размечено.
 
 Браузер откроется сам на `http://127.0.0.1:8766`. Результат пишется в
 `data/annotations/foreign_boxes_<имя>.json` после каждого действия — прерваться

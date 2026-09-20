@@ -83,6 +83,10 @@ NOTE_LIMIT = 240
 # Нужны, чтобы отличить «метка шумная» от «разметчик нестабилен» (требование
 # astra и fable, 20.09.2026): без них κ внешнего согласия неинтерпретируем.
 REPEAT_SUFFIX = "#2"
+# Перекрытие частей здесь больше, чем в остальных инструментах: общие снимки
+# дают МЕЖэкспертное согласие, а оно ценнее внутриэкспертного (обе модели,
+# 20.09.2026). Внутриэкспертное меряется скрытыми повторами.
+AXIS_OVERLAP = 25
 
 
 def slot_uid(key):
@@ -389,7 +393,8 @@ small { color: #bac1cc; }
 </main>
 <script>
 "use strict";
-const BASE = __BASE__;
+const BASE = "";
+const TOKEN = __BASE__;
 const REASONS = __REASONS__;
 const reasonKeys = ["a","d","f","g","h","j","k"];
 const el = id => document.getElementById(id);
@@ -411,7 +416,7 @@ function message(text, error=false) {
 async function api(route, data) {
   const response = await fetch(BASE + route, {
     method:"POST",
-    headers:{"Content-Type":"application/json", "X-Axis-Review":BASE},
+    headers:{"Content-Type":"application/json", "X-Axis-Review":TOKEN},
     body:JSON.stringify(data)
   });
   const result = await response.json();
@@ -655,7 +660,11 @@ class ReviewApp:
     def __init__(self, records, args, outfile):
         self.records = records
         self.outfile = outfile
-        self.base = "/" + secrets.token_urlsafe(24)
+        # Адрес — обычный http://127.0.0.1:<порт>/, чтобы его можно было
+        # набрать руками. От посторонних запросов к localhost защищает не
+        # секретный путь, а заголовок X-Axis-Review со случайным токеном.
+        self.base = ""
+        self.token = secrets.token_urlsafe(24)
         self.order = sorted(records)
         random.Random(args.seed).shuffle(self.order)
         # Explicitly avoid the exact CSV order, including very small cohorts.
@@ -807,7 +816,7 @@ class ReviewApp:
 
 
 def handler_factory(app):
-    page = HTML.replace("__BASE__", json.dumps(app.base)).replace(
+    page = HTML.replace("__BASE__", json.dumps(app.token)).replace(
         "__REASONS__", json.dumps(REASONS, ensure_ascii=False)
     ).encode("utf-8")
 
@@ -853,7 +862,7 @@ def handler_factory(app):
                 self.reply(403, b"Forbidden", "text/plain")
                 return
             path = urlsplit(self.path).path
-            if path in (app.base, app.base + "/"):
+            if path in ("", "/"):
                 self.reply(200, page, "text/html; charset=utf-8")
                 return
             prefix = app.base + "/image/"
@@ -878,7 +887,8 @@ def handler_factory(app):
         def do_POST(self):
             if (
                 not self.valid_host()
-                or self.headers.get("X-Axis-Review") != app.base
+                or not secrets.compare_digest(
+                    self.headers.get("X-Axis-Review", ""), app.token)
                 or self.headers.get("Content-Type", "").split(";")[0]
                 != "application/json"
             ):
@@ -927,6 +937,16 @@ def run_review(records, args):
             "Сначала проверьте пиксели на отсутствие идентификаторов, старых "
             "меток и иных подсказок; затем укажите --clean-pixels-confirmed."
         )
+    part = str(getattr(args, "part", "all"))
+    if part != "all":
+        from annotation_split import describe as describe_split, split_studies
+        all_studies = [r["study"] for r in records.values()]
+        print(describe_split(all_studies, part, overlap=AXIS_OVERLAP, salt="axis"))
+        mine = split_studies(all_studies, part, overlap=AXIS_OVERLAP, salt="axis")
+        records = {uid: r for uid, r in records.items() if r["study"] in mine}
+        if not records:
+            raise ValueError("В этой части не осталось снимков.")
+
     outfile = Path(args.out) / f"axis_review_{args.reviewer}_{args.seed}.json"
     outfile.parent.mkdir(parents=True, exist_ok=True)
     lockfile = outfile.with_suffix(outfile.suffix + ".lock")
@@ -1289,10 +1309,14 @@ def parse_args():
     parser.add_argument("--reviewer")
     parser.add_argument("--out", default="data/annotations")
     parser.add_argument("--seed", type=int, default=20260920)
+    parser.add_argument("--part", default="all", choices=("1", "2", "all"),
+                        help="часть работы: 1 или 2 (делится по исследованиям, "
+                             "25 общих — по ним считается согласие двух "
+                             "разметчиков), all — всё")
     parser.add_argument("--duplicates", type=int, default=10,
                         help="сколько снимков показать повторно (скрытая проверка "
                              "повторяемости; 0 — выключить)")
-    parser.add_argument("--port", type=int, default=8765,
+    parser.add_argument("--port", type=int, default=8768,
                         help="Локальный порт; 0 — свободный порт автоматически")
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument(

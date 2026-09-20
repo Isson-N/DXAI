@@ -4,8 +4,15 @@
 Схема `dxa-hip-points/1`. Порт по умолчанию 8767.
 
 ```bash
-.venv/bin/python tools/hip_annotator.py --index data/index/images.csv --root . --annotator <имя>
+.venv/bin/python tools/hip_annotator.py --index data/index/images.csv --root . \
+    --annotator isson --part 1
+.venv/bin/python tools/hip_annotator.py --index data/index/images.csv --root . \
+    --annotator den   --part 2
 ```
+
+Деление идёт по исследованиям, 6 общих. Это обязательно: иначе левое и правое
+бедро одного пациента попадут к разным людям и сравнение пары превратится
+в сравнение двух разметчиков.
 
 82 слота: 72 снимка (все 36 положительных + 36 отрицательных) и 10 скрытых
 повторов — они выглядят как обычные снимки и нужны для проверки повторяемости.

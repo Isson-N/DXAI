@@ -28,6 +28,8 @@ import pydicom
 from PIL import Image
 
 
+from annotation_split import describe as describe_split, split_studies
+
 SCHEMA = "dxa-foreign-boxes/1"
 
 OBJECT_CLASSES = (
@@ -227,6 +229,14 @@ class Application:
         # наверх то, что ценнее разметить, если человек не дойдёт до конца:
         # все положительные и отрицательные, на которых модель ошибается чаще
         # (совет fable 20.09.2026 — ловушки нужны прежде всего там).
+        part = str(getattr(self.args, "part", "all"))
+        if part != "all":
+            all_studies = [r["study"].strip() for r in rows]
+            print(describe_split(all_studies, part, overlap=10, salt="foreign"),
+                  flush=True)
+            mine = split_studies(all_studies, part, overlap=10, salt="foreign")
+            rows = [r for r in rows if r["study"].strip() in mine]
+
         priority = read_scores(getattr(self.args, "scores", None), rows,
                                getattr(self.args, "priority_top", 40))
         if priority:
@@ -1037,6 +1047,9 @@ def main():
     parser.add_argument("--port", type=int, default=8766)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--reset", action="store_true")
+    parser.add_argument("--part", default="all", choices=("1", "2", "all"),
+                        help="часть работы: 1 или 2 (делится по исследованиям, "
+                             "10 общих для оценки согласия), all — всё")
     parser.add_argument("--scores", default=None,
                         help="CSV с OOF-прогнозами (колонки sop_uid, "
                              "spine_foreign_prob): отрицательные с высоким "

@@ -33,8 +33,15 @@
 ```bash
 cd ~/projects/dxa-quality-ai
 .venv/bin/python tools/axis_review.py \
-    --reviewer <имя_латиницей> --seed 20260920 --clean-pixels-confirmed
+    --reviewer isson --part 1 --clean-pixels-confirmed      # часть 1
+.venv/bin/python tools/axis_review.py \
+    --reviewer den   --part 2 --clean-pixels-confirmed      # часть 2
 ```
+
+Работа делится по исследованиям, **25 снимков достаются обоим** — по ним считается
+межэкспертное согласие, которое ценнее внутриэкспертного (его меряют скрытые повторы).
+Без `--part` размечается вся выборка. Порт по умолчанию 8768 — 8765 занят старым
+разметчиком позвоночника.
 
 Флаг `--clean-pixels-confirmed` — подтверждение, что на снимках нет надписей,
 вшитых в пиксели: метаданные инструмент не рисует, но выжженный в изображении
