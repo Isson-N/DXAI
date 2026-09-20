@@ -69,7 +69,12 @@ class SpineKeypointModel:
         from .nets import KeypointNet
 
         net = KeypointNet(pretrained=False)
-        net.load_state_dict(state_dict)
+        # strict=False: контрольная голова прямой регрессии координат в инференсе не участвует,
+        # и веса, обученные до её появления, должны грузиться без ошибок.
+        missing, unexpected = net.load_state_dict(state_dict, strict=False)
+        blocking = [k for k in missing if not k.startswith("regress.")]
+        if blocking or unexpected:
+            raise ValueError(f"несовместимые веса: нет {blocking}, лишние {list(unexpected)}")
         return net.to(device).eval()
 
     def predict(self, image: np.ndarray, pixel_mm=PIXEL_MM) -> SpinePrediction:
