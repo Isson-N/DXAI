@@ -79,6 +79,15 @@ REASONS = (
     "другое",
 )
 NOTE_LIMIT = 240
+# Скрытые повторы: тот же снимок показывается второй раз под ключом «uid#2».
+# Нужны, чтобы отличить «метка шумная» от «разметчик нестабилен» (требование
+# astra и fable, 20.09.2026): без них κ внешнего согласия неинтерпретируем.
+REPEAT_SUFFIX = "#2"
+
+
+def slot_uid(key):
+    """Ключ очереди → идентификатор снимка (у повтора отбрасывается суффикс)."""
+    return key.split(REPEAT_SUFFIX)[0]
 
 
 def utc_now():
@@ -653,6 +662,19 @@ class ReviewApp:
         if len(self.order) > 1 and self.order == list(records):
             self.order = self.order[1:] + self.order[:1]
 
+        # Повторы берём из первой половины очереди и расставляем во второй,
+        # равномерно и не подряд; разметчику они ничем не отличаются от новых.
+        repeats = min(args.duplicates, len(self.order) // 4)
+        if repeats > 0:
+            rng = random.Random(args.seed ^ 0x5EED)
+            half = len(self.order) // 2
+            step = max(1, half // repeats)
+            picked = [self.order[i * step] for i in range(repeats)]
+            for shift, uid in enumerate(picked):
+                low = half + shift + 1
+                high = len(self.order) + shift
+                self.order.insert(rng.randint(low, high), uid + REPEAT_SUFFIX)
+
         if outfile.exists():
             self.data = load_review(outfile)
             if (
@@ -660,7 +682,8 @@ class ReviewApp:
                 or self.data["seed"] != args.seed
             ):
                 raise ValueError("reviewer/seed сохранённого файла не совпадают")
-            unknown = set(self.data["answers"]) - set(records)
+            unknown = {key for key in self.data["answers"]
+                       if slot_uid(key) not in records}
             if unknown:
                 raise ValueError(
                     "Сохранённый файл содержит снимки вне текущей выборки. "
@@ -778,7 +801,7 @@ class ReviewApp:
         if not self.image_token or token != self.image_token:
             return None
         if self.image_cache is None:
-            uid = self.order[self.position]
+            uid = slot_uid(self.order[self.position])
             self.image_cache = render_dicom(self.records[uid]["path"])
         return self.image_cache
 
@@ -1086,10 +1109,36 @@ def printable(value):
     return str(value).replace("\t", " ").replace("\r", " ").replace("\n", " ")
 
 
+def print_repeatability(repeats, answers):
+    """Скрытые повторы: насколько разметчик воспроизводит сам себя."""
+    pairs = [(answers[slot_uid(key)]["verdict"], answer["verdict"])
+             for key, answer in repeats.items() if slot_uid(key) in answers]
+    if not pairs:
+        print("Скрытых повторов в файле нет (или на них нет ответов).")
+        return
+    same = sum(first == second for first, second in pairs)
+    binary = [(a, b) for a, b in pairs if "unsure" not in (a, b)]
+    same_binary = sum(a == b for a, b in binary)
+    print(
+        f"Скрытые повторы: {len(pairs)}; совпало вердиктов: {same}/{len(pairs)}"
+        + (f"; среди бинарных пар {same_binary}/{len(binary)}" if binary else "")
+    )
+    if len(pairs) and same < len(pairs):
+        print("  расхождения сам с собой: "
+              + "; ".join(f"{a}→{b}" for a, b in pairs if a != b))
+    print("  Внутренняя согласованность ограничивает внешнюю: разметчик не может "
+          "согласиться с чужой меткой лучше, чем с собственной.")
+
+
 def report_one(filename, data, records, args):
     all_answers = data["answers"]
-    answers = {uid: a for uid, a in all_answers.items() if uid in records}
-    unknown = len(all_answers) - len(answers)
+    # Повторные показы считаются отдельно: они измеряют стабильность разметчика,
+    # а не согласие с исходной меткой, и в основную таблицу попадать не должны.
+    repeats = {key: a for key, a in all_answers.items()
+               if key.endswith(REPEAT_SUFFIX) and slot_uid(key) in records}
+    answers = {uid: a for uid, a in all_answers.items()
+               if not uid.endswith(REPEAT_SUFFIX) and uid in records}
+    unknown = len(all_answers) - len(answers) - len(repeats)
     total = len(records)
     missing = total - len(answers)
     unsure = sum(a["verdict"] == "unsure" for a in answers.values())
@@ -1107,6 +1156,7 @@ def report_one(filename, data, records, args):
         f"{percent(unsure, total)} от всей выборки"
     )
     print(f"Изменённых ответов (revised): {revised}/{len(answers)}")
+    print_repeatability(repeats, answers)
 
     table = np.zeros((2, 3), dtype=np.int64)
     columns = {"normal": 0, "deviated": 1, "unsure": 2}
@@ -1239,6 +1289,9 @@ def parse_args():
     parser.add_argument("--reviewer")
     parser.add_argument("--out", default="data/annotations")
     parser.add_argument("--seed", type=int, default=20260920)
+    parser.add_argument("--duplicates", type=int, default=10,
+                        help="сколько снимков показать повторно (скрытая проверка "
+                             "повторяемости; 0 — выключить)")
     parser.add_argument("--port", type=int, default=8765,
                         help="Локальный порт; 0 — свободный порт автоматически")
     parser.add_argument("--no-browser", action="store_true")

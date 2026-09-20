@@ -79,6 +79,29 @@ def atomic_write(filename: Path, value):
                 pass
 
 
+def read_scores(filename, rows, top):
+    """Идентификаторы, которые стоит разметить первыми: все положительные плюс
+    `top` отрицательных с самой высокой вероятностью по OOF-прогнозу модели."""
+    chosen = {row["sop_uid"].strip() for row in rows
+              if binary_label(row["y_foreign"]) == 1}
+    if not filename:
+        return chosen
+    scored = []
+    with open(filename, newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            uid = (row.get("sop_uid") or "").strip()
+            value = (row.get("spine_foreign_prob") or "").strip()
+            if not uid or not value or uid in chosen:
+                continue
+            try:
+                scored.append((float(value), uid))
+            except ValueError:
+                continue
+    scored.sort(reverse=True)
+    chosen.update(uid for _, uid in scored[:max(0, int(top))])
+    return chosen
+
+
 def binary_label(value):
     """Метка из CSV: pandas пишет «0.0»/«1.0», пустая клетка означает «не размечено»."""
     text = str(value).strip()
@@ -199,6 +222,15 @@ class Application:
                 row["sop_uid"].strip(),
             )
         )
+
+        # Порядок внутри групп уже перемешан хешем; приоритет лишь поднимает
+        # наверх то, что ценнее разметить, если человек не дойдёт до конца:
+        # все положительные и отрицательные, на которых модель ошибается чаще
+        # (совет fable 20.09.2026 — ловушки нужны прежде всего там).
+        priority = read_scores(getattr(self.args, "scores", None), rows,
+                               getattr(self.args, "priority_top", 40))
+        if priority:
+            rows.sort(key=lambda row: 0 if row["sop_uid"].strip() in priority else 1)
 
         for row in rows:
             uid = row["sop_uid"].strip()
@@ -1005,6 +1037,12 @@ def main():
     parser.add_argument("--port", type=int, default=8766)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--reset", action="store_true")
+    parser.add_argument("--scores", default=None,
+                        help="CSV с OOF-прогнозами (колонки sop_uid, "
+                             "spine_foreign_prob): отрицательные с высоким "
+                             "прогнозом показываются первыми")
+    parser.add_argument("--priority-top", type=int, default=40,
+                        help="сколько отрицательных с высоким прогнозом поднять наверх")
     args = parser.parse_args()
 
     if not re.fullmatch(r"[A-Za-z0-9_-]+", args.annotator):
