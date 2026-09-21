@@ -106,6 +106,39 @@ def has_coordinates(point):
     return isinstance(point, dict) and "x" in point and "y" in point
 
 
+def migrate_legacy_points(annotation):
+    """Convert the former top/bottom vertebra markup to one center per body."""
+    points = annotation.get("points")
+    if not isinstance(points, dict) or not (set(points) & set(LEGACY_KEYS)):
+        return annotation, False
+
+    migrated = {key: value for key, value in points.items() if key in POINT_KEYS}
+    for vertebra in VERTEBRAE:
+        center_key = f"{vertebra}_center"
+        if center_key in migrated:
+            continue
+        top = points.get(f"{vertebra}_top")
+        bottom = points.get(f"{vertebra}_bottom")
+        if has_coordinates(top) and has_coordinates(bottom):
+            migrated[center_key] = {
+                "x": (top["x"] + bottom["x"]) / 2,
+                "y": (top["y"] + bottom["y"]) / 2,
+            }
+        elif (
+            isinstance(top, dict) and isinstance(bottom, dict)
+            and top.get("state") == bottom.get("state")
+            and top.get("state") in ("absent", "uncertain")
+        ):
+            migrated[center_key] = {"state": top["state"]}
+        elif top is not None or bottom is not None:
+            # One visible endplate is not enough to infer the body center reliably.
+            migrated[center_key] = {"state": "uncertain"}
+
+    result = dict(annotation)
+    result["points"] = migrated
+    return result, True
+
+
 def derive(annotation):
     centers = {}
     points = annotation["points"]
@@ -222,12 +255,22 @@ class Application:
             self.data = existing
             self.data["part"] = str(args.part)
             self.data["pixel_spacing_mm"] = SPACING
+            legacy_migrated = False
             for uid in self.order:
                 if uid in self.data["images"]:
                     previous = self.data["images"][uid]
+                    previous, migrated = migrate_legacy_points(previous)
+                    legacy_migrated = legacy_migrated or migrated
                     cleaned = self.validate(uid, previous)
                     cleaned["updated_at"] = previous.get("updated_at", "")
                     self.data["images"][uid] = cleaned
+            if legacy_migrated:
+                backup = self.filename.with_suffix(
+                    f".legacy-{datetime.now():%Y%m%d-%H%M%S}.json"
+                )
+                backup.write_bytes(self.filename.read_bytes())
+                atomic_write(self.filename, self.data)
+                print(f"Старая разметка преобразована; исходный файл: {backup}", flush=True)
         self.filename.parent.mkdir(parents=True, exist_ok=True)
 
     def blank(self, uid):
