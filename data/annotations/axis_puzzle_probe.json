@@ -1,172 +1,82 @@
 {
   "schema": "dxa-axis-puzzle/1",
-  "session_revision": 155,
+  "session_revision": 2,
   "items": {
     "1.2.643.5.1.13.13.12.2.77.8252.10001500010311100907131007040004": {
       "points": {
         "Th12": {
           "top": {
             "state": "visible",
-            "confidence": 1,
-            "x": 0.46495400229868505,
-            "y": 0.022719355088174038
+            "confidence": 2,
+            "x": 0.48,
+            "y": 0.1
           },
           "bottom": {
-            "state": "visible",
-            "confidence": 1,
-            "x": 0.4892404471532322,
-            "y": 0.13092796228680378
+            "state": "not_visible",
+            "confidence": 1
           }
         },
         "L1": {
           "top": {
-            "state": "visible",
-            "confidence": 1,
-            "x": 0.49729261013777176,
-            "y": 0.18754559718839559
+            "state": "not_visible",
+            "confidence": 1
           },
           "bottom": {
-            "state": "visible",
-            "confidence": 1,
-            "x": 0.5033318859613405,
-            "y": 0.31776618625927505
+            "state": "not_visible",
+            "confidence": 1
           }
         },
         "L2": {
           "top": {
-            "state": "visible",
-            "confidence": 1,
-            "x": 0.5093711617849093,
-            "y": 0.34984945510907384
+            "state": "not_visible",
+            "confidence": 1
           },
           "bottom": {
-            "state": "visible",
-            "confidence": 1,
-            "x": 0.5133972432771791,
-            "y": 0.4706337716963547
+            "state": "not_visible",
+            "confidence": 1
           }
         },
         "L3": {
           "top": {
-            "state": "visible",
-            "confidence": 1,
-            "x": 0.5093711617849093,
-            "y": 0.500829814846652
+            "state": "not_visible",
+            "confidence": 1
           },
           "bottom": {
-            "state": "visible",
-            "confidence": 1,
-            "x": 0.5174233247694489,
-            "y": 0.6385994507016286
+            "state": "not_visible",
+            "confidence": 1
           }
         },
         "L4": {
           "top": {
-            "state": "visible",
-            "confidence": 1,
-            "x": 0.5113842025310442,
-            "y": 0.6895552645186247
+            "state": "not_visible",
+            "confidence": 1
           },
           "bottom": {
-            "state": "visible",
-            "confidence": 1,
-            "x": 0.5174233247694489,
-            "y": 0.8216630792890056
+            "state": "not_visible",
+            "confidence": 1
           }
         },
         "L5": {
           "top": {
-            "state": "visible",
-            "confidence": 1,
-            "x": 0.5133972432771791,
-            "y": 0.870731739399546
+            "state": "not_visible",
+            "confidence": 1
           },
           "bottom": {
             "state": "visible",
-            "confidence": 1,
-            "x": 0.5154102840233139,
-            "y": 0.9820797835032281
+            "confidence": 3,
+            "x": 0.52,
+            "y": 0.86
           }
         }
       },
-      "comment": "Слабый наклон при переходе в грудной ",
+      "comment": "столб наклонён влево относительно края кадра",
       "verdict": "axis_deviated",
       "features": [
         "whole_column_tilted"
       ],
       "status": "done",
-      "seconds": 245.19750000005925,
-      "updated": "2026-09-21T20:50:11.095052+00:00"
-    },
-    "1.2.643.5.1.13.13.12.2.77.8252.15141302131508150312140605060212": {
-      "points": {
-        "Th12": {
-          "top": {
-            "state": "not_visible",
-            "confidence": 1
-          },
-          "bottom": {
-            "state": "not_visible",
-            "confidence": 1
-          }
-        },
-        "L1": {
-          "top": {
-            "state": "not_visible",
-            "confidence": 1
-          },
-          "bottom": {
-            "state": "not_visible",
-            "confidence": 1
-          }
-        },
-        "L2": {
-          "top": {
-            "state": "not_visible",
-            "confidence": 1
-          },
-          "bottom": {
-            "state": "not_visible",
-            "confidence": 1
-          }
-        },
-        "L3": {
-          "top": {
-            "state": "not_visible",
-            "confidence": 1
-          },
-          "bottom": {
-            "state": "not_visible",
-            "confidence": 1
-          }
-        },
-        "L4": {
-          "top": {
-            "state": "not_visible",
-            "confidence": 1
-          },
-          "bottom": {
-            "state": "not_visible",
-            "confidence": 1
-          }
-        },
-        "L5": {
-          "top": {
-            "state": "not_visible",
-            "confidence": 1
-          },
-          "bottom": {
-            "state": "not_visible",
-            "confidence": 1
-          }
-        }
-      },
-      "comment": "",
-      "verdict": "cannot_decide",
-      "features": [],
-      "status": "done",
-      "seconds": 1.6017999999821186,
-      "updated": "2026-09-21T20:47:56.437294+00:00"
+      "seconds": 0.0,
+      "updated": "2026-09-21T20:49:54.176241+00:00"
     }
   },
   "session": {

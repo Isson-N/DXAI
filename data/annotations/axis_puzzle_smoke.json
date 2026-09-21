@@ -1,6 +1,6 @@
 {
   "schema": "dxa-axis-puzzle/1",
-  "session_revision": 62,
+  "session_revision": 75,
   "items": {
     "1.2.643.5.1.13.13.12.2.77.8252.10001500010311100907131007040004": {
       "points": {
@@ -8,8 +8,82 @@
           "top": {
             "state": "visible",
             "confidence": 1,
-            "x": 0.47091930513221886,
-            "y": 0.01992310605151508
+            "x": 0.46495400229868505,
+            "y": 0.022719355088174038
+          },
+          "bottom": {
+            "state": "visible",
+            "confidence": 1,
+            "x": 0.5,
+            "y": 0.4
+          }
+        },
+        "L1": {
+          "top": {
+            "state": "visible",
+            "confidence": 1,
+            "x": 0.49930580446907075,
+            "y": 0.17622213500181833
+          },
+          "bottom": {
+            "state": "not_visible",
+            "confidence": 1
+          }
+        },
+        "L2": {
+          "top": {
+            "state": "not_visible",
+            "confidence": 1
+          },
+          "bottom": {
+            "state": "not_visible",
+            "confidence": 1
+          }
+        },
+        "L3": {
+          "top": {
+            "state": "not_visible",
+            "confidence": 1
+          },
+          "bottom": {
+            "state": "not_visible",
+            "confidence": 1
+          }
+        },
+        "L4": {
+          "top": {
+            "state": "not_visible",
+            "confidence": 1
+          },
+          "bottom": {
+            "state": "not_visible",
+            "confidence": 1
+          }
+        },
+        "L5": {
+          "top": {
+            "state": "not_visible",
+            "confidence": 1
+          },
+          "bottom": {
+            "state": "not_visible",
+            "confidence": 1
+          }
+        }
+      },
+      "comment": "",
+      "verdict": "axis_deviated",
+      "features": [],
+      "status": "done",
+      "seconds": 154.80890000003578,
+      "updated": "2026-09-21T20:48:44.092550+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.15141302131508150312140605060212": {
+      "points": {
+        "Th12": {
+          "top": {
+            "state": "not_visible",
+            "confidence": 1
           },
           "bottom": {
             "state": "not_visible",
@@ -68,11 +142,11 @@
         }
       },
       "comment": "",
-      "verdict": "axis_deviated",
+      "verdict": "cannot_decide",
       "features": [],
-      "status": "draft",
-      "seconds": 119.28890000003577,
-      "updated": "2026-09-21T20:39:08.051089+00:00"
+      "status": "done",
+      "seconds": 1.6017999999821186,
+      "updated": "2026-09-21T20:47:56.437294+00:00"
     }
   },
   "session": {

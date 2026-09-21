@@ -316,7 +316,9 @@ def blank_annotation():
     return {
         "points": blank_points(),
         "comment": "",
-        "verdict": "cannot_decide",
+        # Вердикта по умолчанию нет: «не могу решить» — это осознанный ответ,
+        # и он не должен быть неотличим от «разметчик не дошёл до снимка».
+        "verdict": None,
         "features": [],
         "status": "draft",
         "seconds": 0.0,
@@ -869,16 +871,17 @@ function account(){
 
 function statusMode(){
  if(ann.status==="skipped")return "skipped";
- return pointNames.every(name=>{
-  const [v,l]=name.split("_");
-  return ann.points[v][l].state;
- }) ? "done" : "draft";
+ // Состояние есть у каждой точки с самого начала («не видна»), поэтому оно
+ // ничего не доказывает: прежняя проверка объявляла снимок завершённым сразу
+ // при открытии, сервер отвергал сохранение без вердикта, и работа вставала.
+ // Завершает снимок вердикт — он и есть главный результат этой задачи.
+ return ann.verdict ? "done" : "draft";
 }
 
 function saveStatus(){
  $("save").textContent=failed?"НЕ СОХРАНЕНО":
    pending?"Сохранение…":dirty?"Изменения в памяти":"Сохранено ✓";
- $("retry").hidden=!failed||conflict;
+ $("retry").hidden=!failed;
 }
 
 function queueSave(cursor=index,requestedMode=null){
@@ -893,7 +896,10 @@ function queueSave(cursor=index,requestedMode=null){
  saveStatus();
 
  tail=tail.then(async()=>{
-  if(failed)return false;
+  // Раньше здесь стоял тихий выход при failed: каждое следующее сохранение
+  // отбрасывалось без следа. Теперь пробуем — очередь сама себя чинит,
+  // как только связь или ревизия приходят в порядок.
+  if(conflict)return false;
   try{
    const result=await api("/api/save",{
     method:"POST",
@@ -961,6 +967,13 @@ function setState(state){
  if(!ann||busy)return;
 
  const point=pointValue();
+ if(state==="visible"&&!Number.isFinite(point.x)){
+  // Сервер не принимает «видна» без координаты. Тупика это не создаёт:
+  // щелчок по изображению сам ставит и координату, и состояние.
+  error("Сначала поставьте координату щелчком — состояние «видна» выставится само.");
+  render();
+  return;
+ }
 
  mutate(()=>{
   const result={
@@ -1471,7 +1484,20 @@ $("comment").oninput=()=>{
 };
 
 $("retry").onclick=async()=>{
- if(conflict||pending||!ann)return;
+ if(pending||!ann)return;
+ if(conflict){
+  // Ревизия разошлась с сервером — берём свежую и отправляем поверх.
+  // Данные этой вкладки сохраняются; если параллельно работала другая,
+  // её правки этого снимка будут перезаписаны.
+  try{
+   const session=await api("/api/session");
+   revision=session.revision;
+   conflict=false;
+  }catch(e){
+   error("Не удалось связаться с сервером: "+e.message);
+   return;
+  }
+ }
  failed=false;
  error();
  await autoQueue();
