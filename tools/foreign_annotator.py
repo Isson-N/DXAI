@@ -781,7 +781,11 @@ function enqueue(){
    method:"PUT",headers:{"Content-Type":"application/json"},
    body:JSON.stringify(snapshot)
   }).then(saved=>{
-   saveOK=true;ann=saved;current.annotated=true;showError("");
+   // Ответ НЕ подменяет ann: пока запрос летел, человек мог удалить рамку или
+   // поменять толщину, и старый ответ возвращал удалённое обратно (аудит 1.2).
+   // Экран остаётся авторитетным, от сервера берём только факт сохранения.
+   saveOK=true;current.annotated=true;showError("");
+   if(saved&&saved.state)current.state=saved.state;
   }).catch(e=>{
    saveOK=false;showError(e.message+
     " Изменения остаются в браузере. Нажмите «Повторить сохранение».")
@@ -1023,7 +1027,7 @@ function renderBoxes(){
   let del=document.createElement("button");del.textContent="Удалить";
   del.onclick=()=>mutate(()=>{
    ann.boxes.splice(i,1);
-   selected=-1
+   selected=-1;gesture=null   // иначе удалённую рамку можно продолжить тянуть
   });
   let u=document.createElement("button");
   u.textContent=q.sure?"U":"Уверенно";
@@ -1234,7 +1238,10 @@ $("overlay").onwheel=e=>{
  e.preventDefault();
 
  if(e.shiftKey){
-  let amount=e.deltaY||e.deltaX;
+  // С зажатым Shift браузер переносит прокрутку в deltaX, а на тачпадах обе оси
+  // приходят ненулевыми и с разными знаками — толщина от этого прыгала.
+  // Берём ту ось, где движение больше по модулю.
+  let amount=Math.abs(e.deltaY)>=Math.abs(e.deltaX)?e.deltaY:e.deltaX;
   if(amount!==0)adjustThickness(amount<0?1:-1);
   return
  }
@@ -1301,13 +1308,13 @@ document.onkeydown=e=>{
  if(e.key==="Delete"&&selected>=0){
   mutate(()=>{
    ann.boxes.splice(selected,1);
-   selected=-1
+   selected=-1;gesture=null
   })
  }
  if(e.code==="KeyD"&&ann?.boxes.length){
   mutate(()=>{
    ann.boxes.pop();
-   selected=-1
+   selected=-1;gesture=null
   })
  }
  if(e.code==="KeyU"){
