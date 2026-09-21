@@ -98,6 +98,10 @@ def read_images():
 
 
 def empty_point():
+    # Уверенность 3 — «уверен», 1 — «сомневаюсь». По умолчанию 1 (решение
+    # разметчика): уверенность повышается осознанно, а не достаётся даром.
+    # Поэтому «1» у точки с координатой читается как «поставил, но сомневаюсь»,
+    # а не как «значение не трогали».
     return {"x": None, "y": None, "state": "not_visible", "confidence": 1}
 
 
@@ -396,9 +400,9 @@ input[type=range]{width:100%}
     </div>
     <div>
       Уверенность:
-      <button data-confidence="1">1</button>
-      <button data-confidence="2">2</button>
-      <button data-confidence="3">3</button>
+      <button data-confidence="3">3 — уверен</button>
+      <button data-confidence="2">2 — так себе</button>
+      <button data-confidence="1">1 — сомневаюсь</button>
     </div>
     <button id="deletePoint">Удалить координату</button>
   </fieldset>
