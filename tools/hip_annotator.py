@@ -757,6 +757,8 @@ Uncertain допускает координату, только если ест�
 <p class="small">
 1–6 — точка. Shift+1–3 или NumPad1–3 — уверенность.<br>
 ЛКМ — поставить; затем выбирается следующая точка.<br>
+<b>Поставленную точку можно перетащить мышью</b> — потяните прямо за неё.
+D и D₂ при этом остаются на своей направляющей.<br>
 Колесо — зум; ПКМ или Space+мышь — панорама.<br>
 <b>V</b> — видна, <b>X</b> — не видна, <b>O</b> — вне кадра, <b>?</b> — не уверен.
 Состояние применяется к выбранной точке; координату при X и O ставить нельзя.<br>
@@ -1007,7 +1009,35 @@ function put(p){
  mutate(()=>{
   ann.points[key]={x:q.x,y:q.y,state:preferredState,confidence:preferredConfidence};
  });
- choose((selected+1)%6)
+ // Раньше выбор замыкался в кольцо: после D₂ активной снова становилась H,
+ // и попытка поправить последнюю точку лишним щелчком молча уносила H
+ // на диафиз. Дойдя до конца, остаёмся на месте.
+ if(selected<names.length-1)choose(selected+1)
+}
+function pointAt(p){
+ // Индекс точки под курсором или −1. Явная инициализация: на снимке без точек
+ // функция обязана вернуть «ничего», а не первый попавшийся индекс.
+ if(!ann)return -1;
+ let best=-1,near=10;
+ names.forEach((key,i)=>{
+  const q=ann.points[key];
+  if(!Number.isFinite(q?.x))return;
+  const d=Math.hypot(ox+q.x*zoom-p.x,oy+q.y*zoom-p.y);
+  if(d<near){near=d;best=i}
+ });
+ return best
+}
+function dragTo(p){
+ const key=names[selected],point=ann?.points[key];
+ if(!point)return;
+ const q=native(p);
+ if(q.x<0||q.y<0||q.x>=current.cols||q.y>=current.rows)return;
+ if(key==="D"||key==="D2"){
+  const y=level(key);
+  if(y===null)return;
+  q.y=y;                      // D и D₂ не сходят с направляющей и при перетаскивании
+ }
+ point.x=q.x;point.y=q.y;dirty=true;draw()
 }
 async function load(i){
  busy=true;$("veil").hidden=false;image=null;gesture=null;draw();
@@ -1051,7 +1081,12 @@ $("canvas").onpointerdown=e=>{
  const p=pointer(e);
  if(e.button===2||(e.button===0&&space))
   gesture={kind:"pan",p,ox,oy,id:e.pointerId};
- else if(e.button===0)gesture={kind:"point",p,id:e.pointerId};
+ else if(e.button===0){
+  const hit=pointAt(p);
+  // Щелчок по уже поставленной точке берёт её, а не ставит выбранную поверх.
+  if(hit>=0){choose(hit);gesture={kind:"drag",p,id:e.pointerId}}
+  else gesture={kind:"point",p,id:e.pointerId};
+ }
  if(gesture){$("canvas").setPointerCapture(e.pointerId);e.preventDefault()}
 };
 $("canvas").onpointermove=e=>{
@@ -1060,6 +1095,7 @@ $("canvas").onpointermove=e=>{
  if(gesture?.kind==="pan"){
   ox=gesture.ox+p.x-gesture.p.x;oy=gesture.oy+p.y-gesture.p.y;draw()
  }
+ else if(gesture?.kind==="drag")dragTo(p);
 };
 $("canvas").onpointerup=e=>{
  if(!gesture)return;
@@ -1067,6 +1103,10 @@ $("canvas").onpointerup=e=>{
  if(g.kind==="point"){
   const p=pointer(e);
   if(Math.hypot(p.x-g.p.x,p.y-g.p.y)<6)put(p)
+ }
+ else if(g.kind==="drag"){
+  dragTo(pointer(e));
+  mutate(()=>{});           // перенос записывается один раз, в конце жеста
  }
 };
 $("canvas").onpointercancel=()=>{gesture=null};
