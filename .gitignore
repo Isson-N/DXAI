@@ -38,6 +38,8 @@ data/*.txt
 # Разметка версионируется: UID исследований, по подтверждению организатора,
 # случайные и пациентов не идентифицируют. Резервные копии — мимо git.
 data/annotations/*.bak-*
+data/annotations/*.backup-*
+data/annotations/*.legacy-*
 
 # Предсказания на уровне снимков — производные от данных организатора
 experiments/results/*/oof.csv
