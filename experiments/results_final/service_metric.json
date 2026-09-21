@@ -1,0 +1,54 @@
+{
+ "violations": {
+  "обрезка поясницы": {
+   "n": 99,
+   "n_positive": 6,
+   "f1": 0.9091,
+   "source": "geometry_crest",
+   "tp": 5,
+   "fp": 0,
+   "fn": 1
+  },
+  "ось позвоночника": {
+   "n": 99,
+   "n_positive": 10,
+   "f1": 0.4545,
+   "source": "geometry_angle",
+   "tp": 5,
+   "fp": 7,
+   "fn": 5
+  },
+  "предметы": {
+   "n": 99,
+   "n_positive": 17,
+   "f1": 0.2105,
+   "source": "spine_foreign_pred",
+   "tp": 4,
+   "fp": 17,
+   "fn": 13
+  },
+  "ротация бедра": {
+   "n": 150,
+   "n_positive": 36,
+   "f1": 0.5833,
+   "source": "hip_pos_pred",
+   "tp": 21,
+   "fp": 15,
+   "fn": 15
+  },
+  "область интереса бедра": {
+   "n": 150,
+   "n_positive": 7,
+   "f1": 0.5714,
+   "source": "hip_roi_pred",
+   "tp": 4,
+   "fp": 3,
+   "fn": 3
+  }
+ },
+ "macro_f1": 0.5458,
+ "macro_f1_ci95": [
+  0.4141,
+  0.6268
+ ]
+}

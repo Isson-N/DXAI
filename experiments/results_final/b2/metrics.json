@@ -1,0 +1,650 @@
+{
+  "model": "b2",
+  "metrics": {
+    "region": {
+      "n": 252,
+      "n_positive": 153,
+      "n_negative": 99,
+      "f1": {
+        "value": 0.9900990099009901,
+        "ci95": [
+          0.972972972972973,
+          1.0
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "sensitivity": {
+        "value": 0.9803921568627451,
+        "ci95": [
+          0.9473684210526315,
+          1.0
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "specificity": {
+        "value": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "roc_auc": {
+        "value": 1.0,
+        "ci95": [
+          0.9999999999999999,
+          1.0
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "ap": {
+        "value": 0.9999999999999998,
+        "ci95": [
+          0.9999999999999998,
+          1.0000000000000002
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      }
+    },
+    "spine_any": {
+      "n": 99,
+      "n_positive": 31,
+      "n_negative": 68,
+      "f1": {
+        "value": 0.37037037037037035,
+        "ci95": [
+          0.19607843137254902,
+          0.5283296337402884
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "sensitivity": {
+        "value": 0.3225806451612903,
+        "ci95": [
+          0.16666666666666666,
+          0.5
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "specificity": {
+        "value": 0.8088235294117647,
+        "ci95": [
+          0.7142857142857143,
+          0.8961150918047469
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "roc_auc": {
+        "value": 0.5811195445920303,
+        "ci95": [
+          0.4507389162561577,
+          0.7040764755870911
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "ap": {
+        "value": 0.3938675308181644,
+        "ci95": [
+          0.27450528428256693,
+          0.5791579315071698
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      }
+    },
+    "spine_pos": {
+      "n": 99,
+      "n_positive": 6,
+      "n_negative": 93,
+      "f1": {
+        "value": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "sensitivity": {
+        "value": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_skipped_fraction": 0.0020000000000000018
+      },
+      "specificity": {
+        "value": 0.978494623655914,
+        "ci95": [
+          0.945054945054945,
+          1.0
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "roc_auc": {
+        "value": 0.6944444444444443,
+        "ci95": [
+          0.3589520676691729,
+          0.9583333333333333
+        ],
+        "bootstrap_skipped_fraction": 0.0020000000000000018
+      },
+      "ap": {
+        "value": 0.21895037329819936,
+        "ci95": [
+          0.04494076711818647,
+          0.5964132670121003
+        ],
+        "bootstrap_skipped_fraction": 0.0020000000000000018
+      }
+    },
+    "spine_axis": {
+      "n": 99,
+      "n_positive": 10,
+      "n_negative": 89,
+      "f1": {
+        "value": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "sensitivity": {
+        "value": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "specificity": {
+        "value": 0.8876404494382022,
+        "ci95": [
+          0.8191247582205029,
+          0.9518072289156626
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "roc_auc": {
+        "value": 0.44719101123595506,
+        "ci95": [
+          0.2907990047871,
+          0.6095505617977528
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "ap": {
+        "value": 0.09526795550862713,
+        "ci95": [
+          0.05078735519331059,
+          0.18435094690700374
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      }
+    },
+    "spine_foreign": {
+      "n": 99,
+      "n_positive": 17,
+      "n_negative": 82,
+      "f1": {
+        "value": 0.21052631578947367,
+        "ci95": [
+          0.05128205128205128,
+          0.3888888888888889
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "sensitivity": {
+        "value": 0.23529411764705882,
+        "ci95": [
+          0.05263157894736842,
+          0.4667647058823524
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "specificity": {
+        "value": 0.7926829268292683,
+        "ci95": [
+          0.7073170731707317,
+          0.8734213589407828
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "roc_auc": {
+        "value": 0.6316355810616929,
+        "ci95": [
+          0.497946585102018,
+          0.7716931945541149
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "ap": {
+        "value": 0.24963475748319405,
+        "ci95": [
+          0.1437669397060242,
+          0.46283772307767285
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      }
+    },
+    "hip_any": {
+      "n": 150,
+      "n_positive": 41,
+      "n_negative": 109,
+      "f1": {
+        "value": 0.6233766233766234,
+        "ci95": [
+          0.46153846153846156,
+          0.7475378787878785
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "sensitivity": {
+        "value": 0.5853658536585366,
+        "ci95": [
+          0.4166158536585366,
+          0.7380952380952381
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "specificity": {
+        "value": 0.8899082568807339,
+        "ci95": [
+          0.8181620553359684,
+          0.9491632246118786
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "roc_auc": {
+        "value": 0.8083463862161557,
+        "ci95": [
+          0.7067689378868258,
+          0.8961591628176694
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "ap": {
+        "value": 0.7022681931014214,
+        "ci95": [
+          0.5276777654219645,
+          0.8396297881796174
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      }
+    },
+    "hip_pos": {
+      "n": 150,
+      "n_positive": 36,
+      "n_negative": 114,
+      "f1": {
+        "value": 0.5833333333333334,
+        "ci95": [
+          0.40814436885865457,
+          0.7142857142857143
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "sensitivity": {
+        "value": 0.5833333333333334,
+        "ci95": [
+          0.39391233766233763,
+          0.75
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "specificity": {
+        "value": 0.868421052631579,
+        "ci95": [
+          0.7904761904761904,
+          0.9351926523297491
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "roc_auc": {
+        "value": 0.7713206627680311,
+        "ci95": [
+          0.6573891231457021,
+          0.8697601015260481
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "ap": {
+        "value": 0.5791082651655252,
+        "ci95": [
+          0.3889420405938364,
+          0.7652656783336352
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      }
+    },
+    "hip_roi": {
+      "n": 150,
+      "n_positive": 7,
+      "n_negative": 143,
+      "f1": {
+        "value": 0.5714285714285714,
+        "ci95": [
+          0.18181818181818182,
+          0.8181818181818182
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "sensitivity": {
+        "value": 0.5714285714285714,
+        "ci95": [
+          0.2,
+          1.0
+        ],
+        "bootstrap_skipped_fraction": 0.0020000000000000018
+      },
+      "specificity": {
+        "value": 0.9790209790209791,
+        "ci95": [
+          0.9541984732824428,
+          1.0
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "roc_auc": {
+        "value": 0.8116883116883116,
+        "ci95": [
+          0.47152908189880016,
+          0.9977647278150633
+        ],
+        "bootstrap_skipped_fraction": 0.0020000000000000018
+      },
+      "ap": {
+        "value": 0.6185474824179144,
+        "ci95": [
+          0.09669675892068753,
+          0.9587585034013606
+        ],
+        "bootstrap_skipped_fraction": 0.0020000000000000018
+      }
+    },
+    "any_all": {
+      "n": 249,
+      "n_positive": 72,
+      "n_negative": 177,
+      "f1": {
+        "value": 0.5190839694656488,
+        "ci95": [
+          0.3966825198814907,
+          0.6290407173471689
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "sensitivity": {
+        "value": 0.4722222222222222,
+        "ci95": [
+          0.34610655737704915,
+          0.6022800116550117
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "specificity": {
+        "value": 0.8587570621468926,
+        "ci95": [
+          0.8033684840670473,
+          0.9101123595505618
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "roc_auc": {
+        "value": 0.7412507846829881,
+        "ci95": [
+          0.6649280843687742,
+          0.8128403649353082
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "ap": {
+        "value": 0.5778434893972977,
+        "ci95": [
+          0.45234759385873946,
+          0.7000096489407084
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      }
+    },
+    "macro_violations": {
+      "f1": {
+        "value": 0.2730576441102757,
+        "ci95": [
+          0.18294033677567534,
+          0.33449689835448343
+        ],
+        "bootstrap_skipped_fraction": 0.0
+      },
+      "heads": [
+        "spine_pos",
+        "spine_axis",
+        "spine_foreign",
+        "hip_pos",
+        "hip_roi"
+      ]
+    }
+  },
+  "outer_fold_selection": {
+    "0": {
+      "region": {
+        "threshold": 0.9699850082397461,
+        "inner_oof_f1": 1.0
+      },
+      "spine_any": {
+        "threshold": 0.3802410066127777,
+        "inner_oof_f1": 0.4444444444444444
+      },
+      "spine_pos": {
+        "threshold": 0.08961381763219833,
+        "inner_oof_f1": 0.46153846153846156
+      },
+      "spine_axis": {
+        "threshold": 0.13039611279964447,
+        "inner_oof_f1": 0.21052631578947367
+      },
+      "spine_foreign": {
+        "threshold": 0.23440666496753693,
+        "inner_oof_f1": 0.25
+      },
+      "hip_any": {
+        "threshold": 0.21321330964565277,
+        "inner_oof_f1": 0.6956521739130435
+      },
+      "hip_pos": {
+        "threshold": 0.20577459037303925,
+        "inner_oof_f1": 0.6451612903225806
+      },
+      "hip_roi": {
+        "threshold": 0.09964530169963837,
+        "inner_oof_f1": 0.5714285714285714
+      }
+    },
+    "1": {
+      "region": {
+        "threshold": 0.9811668992042542,
+        "inner_oof_f1": 1.0
+      },
+      "spine_any": {
+        "threshold": 0.41294437646865845,
+        "inner_oof_f1": 0.2
+      },
+      "spine_pos": {
+        "threshold": 0.11124119907617569,
+        "inner_oof_f1": 0.2857142857142857
+      },
+      "spine_axis": {
+        "threshold": 0.16066069900989532,
+        "inner_oof_f1": 0.16666666666666666
+      },
+      "spine_foreign": {
+        "threshold": 0.1782395839691162,
+        "inner_oof_f1": 0.24
+      },
+      "hip_any": {
+        "threshold": 0.3350244164466858,
+        "inner_oof_f1": 0.6060606060606061
+      },
+      "hip_pos": {
+        "threshold": 0.28497380018234253,
+        "inner_oof_f1": 0.5263157894736842
+      },
+      "hip_roi": {
+        "threshold": 0.14547918736934662,
+        "inner_oof_f1": 0.6666666666666666
+      }
+    },
+    "2": {
+      "region": {
+        "threshold": 0.978405237197876,
+        "inner_oof_f1": 1.0
+      },
+      "spine_any": {
+        "threshold": 0.36931508779525757,
+        "inner_oof_f1": 0.47619047619047616
+      },
+      "spine_pos": {
+        "threshold": 0.0991208627820015,
+        "inner_oof_f1": 0.4
+      },
+      "spine_axis": {
+        "threshold": 0.13603349030017853,
+        "inner_oof_f1": 0.23529411764705882
+      },
+      "spine_foreign": {
+        "threshold": 0.20260091125965118,
+        "inner_oof_f1": 0.20689655172413793
+      },
+      "hip_any": {
+        "threshold": 0.2465333193540573,
+        "inner_oof_f1": 0.6857142857142857
+      },
+      "hip_pos": {
+        "threshold": 0.24166831374168396,
+        "inner_oof_f1": 0.6557377049180327
+      },
+      "hip_roi": {
+        "threshold": 0.16158467531204224,
+        "inner_oof_f1": 0.7272727272727273
+      }
+    },
+    "3": {
+      "region": {
+        "threshold": 0.9790958166122437,
+        "inner_oof_f1": 1.0
+      },
+      "spine_any": {
+        "threshold": 0.3246634900569916,
+        "inner_oof_f1": 0.46511627906976744
+      },
+      "spine_pos": {
+        "threshold": 0.11357959359884262,
+        "inner_oof_f1": 0.3333333333333333
+      },
+      "spine_axis": {
+        "threshold": 0.2233770787715912,
+        "inner_oof_f1": 0.2222222222222222
+      },
+      "spine_foreign": {
+        "threshold": 0.1703699231147766,
+        "inner_oof_f1": 0.36363636363636365
+      },
+      "hip_any": {
+        "threshold": 0.19682618975639343,
+        "inner_oof_f1": 0.6268656716417911
+      },
+      "hip_pos": {
+        "threshold": 0.19238758087158203,
+        "inner_oof_f1": 0.576271186440678
+      },
+      "hip_roi": {
+        "threshold": 0.12137296795845032,
+        "inner_oof_f1": 0.5
+      }
+    },
+    "4": {
+      "region": {
+        "threshold": 0.9955142140388489,
+        "inner_oof_f1": 1.0
+      },
+      "spine_any": {
+        "threshold": 0.31257981061935425,
+        "inner_oof_f1": 0.3333333333333333
+      },
+      "spine_pos": {
+        "threshold": 0.10502681136131287,
+        "inner_oof_f1": 0.2857142857142857
+      },
+      "spine_axis": {
+        "threshold": 0.10230471193790436,
+        "inner_oof_f1": 0.09523809523809523
+      },
+      "spine_foreign": {
+        "threshold": 0.17300859093666077,
+        "inner_oof_f1": 0.25
+      },
+      "hip_any": {
+        "threshold": 0.23074638843536377,
+        "inner_oof_f1": 0.5671641791044776
+      },
+      "hip_pos": {
+        "threshold": 0.20481863617897034,
+        "inner_oof_f1": 0.5161290322580645
+      },
+      "hip_roi": {
+        "threshold": 0.08079154044389725,
+        "inner_oof_f1": 0.8
+      }
+    }
+  },
+  "training_seconds": 593.514074228704,
+  "preprocessing_seconds": 8.739847026765347,
+  "encoder_initialization_seconds": 36.89607688784599,
+  "evaluation_seconds": 62.2586394995451,
+  "environment": {
+    "python": "3.11.15",
+    "platform": "Linux-5.4.0-212-generic-x86_64-with-glibc2.31",
+    "numpy": "2.4.6",
+    "pandas": "3.0.6",
+    "pydicom": "3.0.2",
+    "scikit-learn": "1.9.1",
+    "torch": "2.8.0+cu128",
+    "torchvision": "0.23.0",
+    "timm": "1.0.29",
+    "cuda": "12.8",
+    "cudnn": 91002
+  },
+  "arguments": {
+    "index": "data/index/images.csv",
+    "folds": "experiments/folds.csv",
+    "root": "/home/ibessonov/dxa",
+    "out": "experiments/results_final",
+    "models": "b2",
+    "epochs": 30,
+    "seed": 42,
+    "device": "cuda",
+    "workers": 0,
+    "size": 384,
+    "threshold_tolerance": 0.0,
+    "final_model": false,
+    "min_specificity": 0.8,
+    "top_fraction": 0.4,
+    "channels": "physical",
+    "foreign_branch": true,
+    "pretrained": true
+  },
+  "pretrained_loaded": true,
+  "protocol": {
+    "outer_folds": 5,
+    "inner_folds": 4,
+    "bootstrap_replicates": 2000,
+    "bootstrap_cluster": "study",
+    "region_positive": "hip",
+    "threshold_rule": "probability >= threshold",
+    "C_selection": "максимум внутреннего OOF F1 с подбором порога; при равенстве меньше C",
+    "any_all": "объединение региональных any по истинной области",
+    "undefined_f1": 0.0,
+    "auc_ap": "не определены без одного из классов",
+    "ci_scope": "кластерный бутстрэп фиксированных OOF, без переобучения",
+    "features": "яркостные признаки до паддинга, после нормировки"
+  }
+}
