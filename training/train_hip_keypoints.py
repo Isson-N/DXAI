@@ -452,7 +452,8 @@ def main():
         va_loader = DataLoader(va_ds, batch_size=8, shuffle=False, num_workers=args.workers)
         te_loader = DataLoader(te_ds, batch_size=8, shuffle=False, num_workers=args.workers)
 
-        model = KeypointNet(args.pretrained).to(device)
+        model = KeypointNet(args.pretrained, n_points=len(POINTS),
+                            state_sizes=[len(POINT_STATES)] * len(POINTS)).to(device)
         model = train_one(model, tr_loader, va_loader, device, args)
         model.eval()
 
@@ -535,7 +536,8 @@ def main():
                                batch_size=8, shuffle=True, num_workers=args.workers)
         va_loader = DataLoader(KeypointDataset(val, annotations, image_cache, args.size, False),
                                batch_size=8, shuffle=False, num_workers=args.workers)
-        model = KeypointNet(args.pretrained).to(device)
+        model = KeypointNet(args.pretrained, n_points=len(POINTS),
+                            state_sizes=[len(POINT_STATES)] * len(POINTS)).to(device)
         model = train_one(model, tr_loader, va_loader, device, args)
         target = Path(args.final_model)
         target.parent.mkdir(parents=True, exist_ok=True)
