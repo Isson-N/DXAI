@@ -931,7 +931,10 @@ function autoQueue(){
 }
 
 function mutate(fn){
- if(!ann||busy||failed)return;
+ // Неудачное сохранение не должно запрещать правку: иначе разметчик молча
+ // теряет возможность работать, а клик перестаёт отвечать без объяснения.
+ // Изменения копятся в памяти, очередь сохранения повторит их сама.
+ if(!ann||busy)return;
  account();
  fn();
  if(ann.status!=="done"&&ann.status!=="skipped")ann.status="draft";
@@ -955,7 +958,7 @@ function pointValue(){
 }
 
 function setState(state){
- if(!ann||busy||failed)return;
+ if(!ann||busy)return;
 
  const point=pointValue();
 
@@ -978,7 +981,7 @@ function setState(state){
 }
 
 function setConfidence(value){
- if(!ann||busy||failed)return;
+ if(!ann||busy)return;
 
  const [v,l]=selectedParts();
  if(ann.points[v][l]){
@@ -1179,7 +1182,7 @@ function nativePoint(point){
 }
 
 function put(point){
- if(!ann||busy||failed||!image)return;
+ if(!ann||busy||!image)return;
 
  const q=nativePoint(point);
  if(q.x<0||q.x>1||q.y<0||q.y>1)return;
@@ -1232,7 +1235,7 @@ function pointAt(point){
 }
 
 function dragTo(point){
- if(!ann||busy||failed)return;
+ if(!ann||busy)return;
 
  const q=nativePoint(point);
  if(q.x<0||q.x>1||q.y<0||q.y>1)return;
@@ -1338,7 +1341,7 @@ async function go(delta,skip=false){
 $("canvas").oncontextmenu=event=>event.preventDefault();
 
 $("canvas").onpointerdown=event=>{
- if(!ann||busy||failed||!image)return;
+ if(!ann||busy||!image)return;
 
  const point=pointer(event);
 
