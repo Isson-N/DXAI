@@ -886,6 +886,9 @@ function saveStatus(){
 
 function queueSave(cursor=index,requestedMode=null){
  if(!ann)return Promise.resolve(false);
+ // Отложенное сохранение больше не нужно: мы сохраняем прямо сейчас.
+ clearTimeout(saveTimer);
+ saveTimer=null;
 
  account();
  const snapshot=clone(ann);
@@ -930,7 +933,18 @@ function queueSave(cursor=index,requestedMode=null){
  return tail;
 }
 
+let saveTimer=null;
+
+function scheduleSave(){
+ // Отложенное сохранение: пока разметчик печатает или быстро ставит точки,
+ // запросы не множатся. Любой немедленный вызов autoQueue() таймер отменяет.
+ clearTimeout(saveTimer);
+ saveTimer=setTimeout(()=>{saveTimer=null;autoQueue();},700);
+}
+
 function autoQueue(){
+ clearTimeout(saveTimer);
+ saveTimer=null;
  const mode=(ann.status==="done"||ann.status==="skipped")
   ?ann.status:"draft";
  return queueSave(index,mode);
@@ -943,10 +957,10 @@ function mutate(fn){
  if(!ann||busy)return;
  account();
  fn();
- if(ann.status!=="done"&&ann.status!=="skipped")ann.status="draft";
+ if(ann.status!=="skipped")ann.status=ann.verdict?"done":"draft";
  dirty=true;
  render();
- autoQueue();
+ scheduleSave();
 }
 
 function selectedParts(){
