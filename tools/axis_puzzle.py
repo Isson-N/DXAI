@@ -1,958 +1,1855 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Четвёртый инструмент разметки: точки замыкательных пластинок Th12--L5.
-
-Запуск:
-    python tools/axis_puzzle.py --annotator ivan
-    python tools/axis_puzzle.py --annotator ivan --port 8769
-"""
+# tools/axis_puzzle.py
+#
+# pip install pydicom pillow numpy
+#
+# python tools/axis_puzzle.py \
+#   --index data/index/images.csv --root . --annotator ivan
+#
+# Инструмент разбора оси позвоночника на DXA-снимках.
+# Очередь берётся из data/index/axis_puzzle_queue.csv.
+# Служебные метаданные снимка намеренно не передаются в браузер и не
+# сохраняются в файле разметки.
 
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
+import io
 import json
+import math
 import os
+import re
 import secrets
 import tempfile
 import threading
-import uuid
-from http import HTTPStatus
+import time
+import webbrowser
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlsplit
 
-import numpy as np
-import pydicom
-from PIL import Image, ImageEnhance
-from io import BytesIO
-
-
-ROOT = Path(__file__).resolve().parents[1]
-QUEUE_CSV = ROOT / "data/index/axis_puzzle_queue.csv"
-IMAGES_CSV = ROOT / "data/index/images.csv"
-ANNOTATIONS_DIR = ROOT / "data/annotations"
 
 SCHEMA = "dxa-axis-puzzle/1"
+
 VERTEBRAE = ("Th12", "L1", "L2", "L3", "L4", "L5")
-POINT_NAMES = ("top", "bottom")
+LEVELS = ("top", "bottom")
 STATES = ("visible", "not_visible", "out_of_frame", "uncertain")
-VERDICTS = ("deviated", "normal", "cannot_decide")
+VERDICTS = ("axis_deviated", "normal", "cannot_decide")
+
 FEATURES = (
     "whole_column_tilted",
     "lumbar_only_tilted",
-    "pelvis_oblique",
+    "pelvis_tilted",
     "column_shifted_sideways",
     "vertebrae_rotated",
-    "column_cut_by_frame",
+    "column_cut_off",
     "uncertain",
 )
 
+FEATURE_LABELS = {
+    "whole_column_tilted": "наклонён весь столб",
+    "lumbar_only_tilted": "наклонён только поясничный отдел",
+    "pelvis_tilted": "таз перекошен",
+    "column_shifted_sideways": "столб смещён вбок",
+    "vertebrae_rotated": "позвонки повёрнуты вокруг своей оси",
+    "column_cut_off": "кадр обрезает столб",
+    "uncertain": "сомневаюсь",
+}
 
-def parse_number(value):
-    """
-    Разбор чисел из CSV.
 
-    В частности, корректно обрабатывает значения pandas вида "0.0"/"1.0"
-    и пустые клетки.
-    """
-    if value is None:
-        return None
-    value = str(value).strip()
-    if not value:
-        return None
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def finite(value):
+    return type(value) in (int, float) and math.isfinite(value)
+
+
+def atomic_write(filename, value):
+    """Атомарно записывает JSON-файл с принудительной синхронизацией."""
+    filename = Path(filename)
+    filename.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
     try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=filename.parent,
+            prefix="." + filename.name + ".",
+            suffix=".tmp",
+            delete=False,
+        ) as stream:
+            temporary = stream.name
+            json.dump(
+                value,
+                stream,
+                ensure_ascii=False,
+                indent=2,
+                allow_nan=False,
+            )
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        os.replace(temporary, filename)
+        temporary = None
+
+        if os.name == "posix":
+            fd = os.open(str(filename.parent), os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+    finally:
+        if temporary:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
 
 
-def read_queue():
-    result = []
-    with QUEUE_CSV.open("r", encoding="utf-8-sig", newline="") as f:
-        for row in csv.DictReader(f):
-            uid = (row.get("uid") or "").strip()
-            if uid:
-                result.append(uid)
-    return result
+def read_json(filename):
+    def reject_constant(value):
+        raise ValueError(f"Недопустимое JSON-число: {value}")
+
+    with open(filename, encoding="utf-8") as stream:
+        return json.load(stream, parse_constant=reject_constant)
 
 
-def read_images():
+def safe_path(root, relative):
+    relative_path = Path(relative)
+    resolved_root = Path(root).resolve()
+    resolved = (resolved_root / relative_path).resolve()
+
+    if relative_path.is_absolute() or not resolved.is_relative_to(resolved_root):
+        raise ValueError("Путь изображения находится вне --root.")
+
+    return resolved
+
+
+def read_dicom(filename, rows, cols):
+    """Читает один монохромный DICOM и возвращает PNG."""
+    import numpy as np
+    import pydicom
+    from PIL import Image
+
+    try:
+        dataset = pydicom.dcmread(filename)
+    except pydicom.errors.InvalidDicomError:
+        dataset = pydicom.dcmread(filename, force=True)
+
+    pixels = np.asarray(dataset.pixel_array, dtype=np.float64)
+
+    if pixels.ndim == 3 and pixels.shape[0] == 1:
+        pixels = pixels[0]
+
+    if pixels.ndim != 2:
+        raise ValueError("Ожидался один монохромный кадр.")
+
+    if pixels.shape != (rows, cols):
+        raise ValueError("Размер изображения не совпадает с индексом.")
+
+    photometric = str(
+        getattr(dataset, "PhotometricInterpretation", "")
+    )
+    if photometric not in ("MONOCHROME1", "MONOCHROME2"):
+        raise ValueError("Поддерживаются только монохромные изображения.")
+
+    slope = float(getattr(dataset, "RescaleSlope", 1))
+    intercept = float(getattr(dataset, "RescaleIntercept", 0))
+
+    if not math.isfinite(slope) or not math.isfinite(intercept):
+        raise ValueError("Некорректное преобразование интенсивности.")
+
+    pixels = pixels * slope + intercept
+    mask = np.isfinite(pixels)
+
+    if not mask.any():
+        raise ValueError("В изображении нет конечных значений.")
+
+    low = float(pixels[mask].min())
+    high = float(pixels[mask].max())
+
+    pixels = np.nan_to_num(
+        pixels,
+        nan=low,
+        posinf=high,
+        neginf=low,
+    )
+
+    if high > low:
+        pixels = (pixels - low) / (high - low)
+    else:
+        pixels = np.zeros_like(pixels)
+
+    if photometric == "MONOCHROME1":
+        pixels = 1 - pixels
+
+    pixels = np.clip(pixels * 255, 0, 255).astype(np.uint8)
+
+    buffer = io.BytesIO()
+    Image.fromarray(pixels).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def read_index(filename):
+    """
+    Читает только нужные поля images.csv.
+    Никакие дополнительные поля не интерпретируются.
+    """
+    required = {"sop_uid", "path", "rows", "cols"}
     result = {}
-    with IMAGES_CSV.open("r", encoding="utf-8-sig", newline="") as f:
-        for row in csv.DictReader(f):
-            uid = (row.get("sop_uid") or "").strip()
-            path = (row.get("path") or "").strip()
-            if not uid or not path:
-                continue
-            # Поля rows/cols читаются намеренно только как числа. Они не
-            # возвращаются браузеру и не участвуют в слепом интерфейсе.
-            result[uid] = {
+    order = []
+
+    with open(filename, newline="", encoding="utf-8-sig") as stream:
+        reader = csv.DictReader(stream)
+        available = set(reader.fieldnames or ())
+        missing = required - available
+        if missing:
+            raise ValueError(
+                "В images.csv отсутствуют колонки: "
+                + ", ".join(sorted(missing))
+            )
+
+        for line_number, row in enumerate(reader, 2):
+            uid = str(row["sop_uid"] or "").strip()
+            path = str(row["path"] or "").strip()
+
+            if not uid or "#" in uid:
+                raise ValueError(
+                    f"Строка {line_number}: некорректный sop_uid."
+                )
+            if not path:
+                raise ValueError(
+                    f"Строка {line_number}: пустой путь изображения."
+                )
+            if uid in result:
+                raise ValueError(
+                    f"Строка {line_number}: повтор sop_uid."
+                )
+
+            dimensions = []
+            for name in ("rows", "cols"):
+                try:
+                    number = float(row[name])
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f"Строка {line_number}: некорректный {name}."
+                    )
+
+                if (
+                    not math.isfinite(number)
+                    or number < 1
+                    or not number.is_integer()
+                ):
+                    raise ValueError(
+                        f"Строка {line_number}: некорректный {name}."
+                    )
+
+                dimensions.append(int(number))
+
+            record = {
+                "uid": uid,
                 "path": path,
-                "rows": parse_number(row.get("rows")),
-                "cols": parse_number(row.get("cols")),
+                "rows": dimensions[0],
+                "cols": dimensions[1],
             }
-    return result
+            result[uid] = record
+            order.append(uid)
+
+    return result, order
 
 
-def empty_point():
-    # Уверенность 3 — «уверен», 1 — «сомневаюсь». По умолчанию 1 (решение
-    # разметчика): уверенность повышается осознанно, а не достаётся даром.
-    # Поэтому «1» у точки с координатой читается как «поставил, но сомневаюсь»,
-    # а не как «значение не трогали».
-    return {"x": None, "y": None, "state": "not_visible", "confidence": 1}
+def read_queue(filename, images):
+    """Читает ровно одну колонку uid и сохраняет порядок строк."""
+    queue = []
+
+    with open(filename, newline="", encoding="utf-8-sig") as stream:
+        reader = csv.DictReader(stream)
+        if reader.fieldnames != ["uid"]:
+            raise ValueError(
+                "Очередь должна содержать единственную колонку uid."
+            )
+
+        for line_number, row in enumerate(reader, 2):
+            uid = str(row.get("uid") or "").strip()
+
+            if not uid or "#" in uid:
+                raise ValueError(
+                    f"Строка {line_number}: некорректный uid очереди."
+                )
+            if uid not in images:
+                raise ValueError(
+                    f"Строка {line_number}: снимок отсутствует в images.csv."
+                )
+            if uid in queue:
+                raise ValueError(
+                    f"Строка {line_number}: повтор uid в очереди."
+                )
+
+            queue.append(uid)
+
+    if len(queue) != 42:
+        raise ValueError(
+            f"В очереди должно быть 42 снимка, найдено {len(queue)}."
+        )
+
+    return queue
 
 
-def empty_item():
+def blank_points():
     return {
-        "points": {
-            v: {p: empty_point() for p in POINT_NAMES}
-            for v in VERTEBRAE
-        },
+        vertebra: {
+            level: {
+                "state": "not_visible",
+                "confidence": 1,
+            }
+            for level in LEVELS
+        }
+        for vertebra in VERTEBRAE
+    }
+
+
+def blank_annotation():
+    return {
+        "points": blank_points(),
         "comment": "",
-        "verdict": None,
+        "verdict": "cannot_decide",
         "features": [],
         "status": "draft",
+        "seconds": 0.0,
+        "updated": now_iso(),
     }
 
 
-def normalize_point(point):
-    if not isinstance(point, dict):
-        return empty_point()
+def validate_points(raw):
+    if not isinstance(raw, dict):
+        raise ValueError("points должны быть объектом.")
 
-    state = point.get("state")
-    if state not in STATES:
-        state = "not_visible"
+    if set(raw) != set(VERTEBRAE):
+        raise ValueError("Некорректный набор позвонков.")
 
-    try:
-        confidence = int(point.get("confidence", 1))
-    except (TypeError, ValueError):
-        confidence = 1
-    confidence = max(1, min(3, confidence))
+    clean = {}
 
-    x = point.get("x")
-    y = point.get("y")
-
-    if state in ("not_visible", "out_of_frame"):
-        # Обязательное правило: эти состояния не могут иметь координату.
-        x = None
-        y = None
-    else:
-        try:
-            x = float(x)
-            y = float(y)
-        except (TypeError, ValueError):
-            x = None
-            y = None
-
-        if x is None or y is None or not (0 <= x <= 1 and 0 <= y <= 1):
-            x = None
-            y = None
-
-    return {
-        "x": x,
-        "y": y,
-        "state": state,
-        "confidence": confidence,
-    }
-
-
-def normalize_item(value):
-    base = empty_item()
-    if not isinstance(value, dict):
-        return base
-
-    points = value.get("points", {})
     for vertebra in VERTEBRAE:
-        for point_name in POINT_NAMES:
-            base["points"][vertebra][point_name] = normalize_point(
-                points.get(vertebra, {}).get(point_name)
-                if isinstance(points, dict)
-                else None
-            )
+        value = raw.get(vertebra)
+        if not isinstance(value, dict) or set(value) != set(LEVELS):
+            raise ValueError("У каждого позвонка нужны top и bottom.")
 
-    comment = value.get("comment", "")
-    if not isinstance(comment, str):
-        comment = str(comment)
-    base["comment"] = comment[:20000]
+        clean[vertebra] = {}
 
-    verdict = value.get("verdict")
-    base["verdict"] = verdict if verdict in VERDICTS else None
+        for level in LEVELS:
+            point = value[level]
+            if not isinstance(point, dict):
+                raise ValueError("Точка должна быть объектом.")
 
-    features = value.get("features", [])
+            allowed = {"x", "y", "state", "confidence"}
+            if set(point) - allowed:
+                raise ValueError("Неизвестное поле точки.")
+
+            state = point.get("state")
+            confidence = point.get("confidence")
+
+            if state not in STATES:
+                raise ValueError("Неизвестное состояние точки.")
+
+            if type(confidence) is not int or confidence not in (1, 2, 3):
+                raise ValueError("Уверенность должна быть 1–3.")
+
+            # Прежняя версия писала «x: null» у непоставленных точек, поэтому
+            # судим по значению, а не по наличию ключа: иначе файл не читается.
+            has_x = point.get("x") is not None
+            has_y = point.get("y") is not None
+
+            if has_x != has_y:
+                raise ValueError(
+                    "Координаты точки должны задаваться парой."
+                )
+
+            if state in ("not_visible", "out_of_frame") and (
+                has_x or has_y
+            ):
+                raise ValueError(
+                    "Для not_visible и out_of_frame координаты запрещены."
+                )
+
+            if state == "visible" and not (has_x and has_y):
+                raise ValueError(
+                    "Для visible нужны координаты."
+                )
+
+            result = {
+                "state": state,
+                "confidence": confidence,
+            }
+
+            if has_x and has_y:
+                x = point["x"]
+                y = point["y"]
+
+                if (
+                    not finite(x)
+                    or not finite(y)
+                    or not 0 <= x <= 1
+                    or not 0 <= y <= 1
+                ):
+                    raise ValueError(
+                        "Нормированные координаты должны быть в диапазоне 0..1."
+                    )
+
+                result["x"] = float(x)
+                result["y"] = float(y)
+
+            clean[vertebra][level] = result
+
+    return clean
+
+
+def validate_annotation(raw, status=None):
+    if not isinstance(raw, dict):
+        raise ValueError("Разметка должна быть объектом.")
+
+    allowed = {
+        "points",
+        "comment",
+        "verdict",
+        "features",
+        "status",
+        "seconds",
+        "updated",
+    }
+    if set(raw) - allowed:
+        raise ValueError("Неизвестные поля разметки.")
+
+    clean = blank_annotation()
+    clean["points"] = validate_points(raw.get("points"))
+
+    comment = raw.get("comment")
+    if not isinstance(comment, str) or len(comment) > 20000:
+        raise ValueError(
+            "Комментарий должен быть строкой длиной до 20000 символов."
+        )
+    clean["comment"] = comment
+
+    verdict = raw.get("verdict")
+    # Прежняя версия называла этот вердикт «deviated» — принимаем оба написания.
+    if verdict == "deviated":
+        verdict = "axis_deviated"
+    # Черновик без вердикта — нормальное состояние: разметчик ещё не решил.
+    # Обязательность вердикта проверяется ниже, при переводе снимка в «done».
+    if verdict is not None and verdict not in VERDICTS:
+        raise ValueError("Некорректный вердикт.")
+    clean["verdict"] = verdict
+
+    features = raw.get("features")
     if not isinstance(features, list):
-        features = []
-    base["features"] = [
-        x for x in features if isinstance(x, str) and x in FEATURES
-    ]
+        raise ValueError("features должны быть списком.")
 
-    if value.get("status") == "done":
-        base["status"] = "done"
+    if len(set(features)) != len(features):
+        raise ValueError("Признаки не должны повторяться.")
 
-    return base
+    if any(feature not in FEATURES for feature in features):
+        raise ValueError("Неизвестный признак.")
+    clean["features"] = list(features)
+
+    seconds = raw.get("seconds", 0.0)
+    if not finite(seconds) or seconds < 0:
+        raise ValueError("Некорректное время.")
+    clean["seconds"] = float(seconds)
+
+    updated = raw.get("updated", now_iso())
+    if not isinstance(updated, str):
+        raise ValueError("Некорректная дата изменения.")
+    clean["updated"] = updated
+
+    final_status = status if status is not None else raw.get("status")
+    if final_status not in ("draft", "done", "skipped"):
+        raise ValueError("Некорректный статус.")
+
+    if final_status == "done":
+        for vertebra in VERTEBRAE:
+            for level in LEVELS:
+                if not clean["points"][vertebra][level].get("state"):
+                    raise ValueError("Для done нужны все состояния точек.")
+        # Вердикт — главный результат задачи, без него снимок не закрывается.
+        if clean["verdict"] is None:
+            raise ValueError("Снимок нельзя завершить без вердикта.")
+
+    clean["status"] = final_status
+    return clean
 
 
-def load_annotation_file(filename):
-    if not filename.exists():
-        return {
+class Conflict(Exception):
+    pass
+
+
+class Application:
+    def __init__(self, args):
+        self.args = args
+        self.lock = threading.RLock()
+        self.token = secrets.token_urlsafe(32)
+
+        self.filename = (
+            Path(args.out) / f"axis_puzzle_{args.annotator}.json"
+        )
+
+        self.images, image_order = read_index(args.index)
+
+        queue_file = Path("data/index/axis_puzzle_queue.csv")
+        self.order = read_queue(queue_file, self.images)
+
+        self.pngs = {}
+        root = Path(args.root).resolve()
+
+        for uid in self.order:
+            record = self.images[uid]
+            try:
+                self.pngs[uid] = read_dicom(
+                    safe_path(root, record["path"]),
+                    record["rows"],
+                    record["cols"],
+                )
+            except Exception as exc:
+                raise ValueError(
+                    f"Ошибка чтения изображения: {type(exc).__name__}: {exc}"
+                ) from exc
+
+        self.data = {
             "schema": SCHEMA,
-            "session_revision": secrets.token_urlsafe(24),
+            "session_revision": 0,
             "items": {},
+            "session": {
+                "order": list(self.order),
+                "cursor": 0,
+            },
         }
 
-    try:
-        with filename.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            raise ValueError
-    except Exception:
-        # Не выдаём браузеру путь или подробности ошибки.
-        data = {}
-
-    items = data.get("items", {})
-    if not isinstance(items, dict):
-        items = {}
-
-    return {
-        "schema": SCHEMA,
-        "session_revision": str(data.get("session_revision") or
-                                secrets.token_urlsafe(24)),
-        "items": items,
-    }
-
-
-def atomic_write(filename, data):
-    """
-    Атомарная запись: временный файл рядом с целевым + os.replace().
-    Вызывается только под file_lock.
-    """
-    filename.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp_name = tempfile.mkstemp(
-        prefix="." + filename.name + ".",
-        suffix=".tmp",
-        dir=str(filename.parent),
-        text=True,
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-            f.write("\n")
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temp_name, filename)
-    finally:
-        try:
-            os.unlink(temp_name)
-        except FileNotFoundError:
-            pass
-
-
-class App:
-    def __init__(self, annotator):
-        self.annotator = annotator
-        self.filename = ANNOTATIONS_DIR / f"axis_puzzle_{annotator}.json"
-        self.queue = read_queue()
-        self.images = read_images()
-        self.uid_by_index = self.queue[:]
-        self.index_by_uid = {uid: i for i, uid in enumerate(self.queue)}
-
-        self.file_lock = threading.RLock()
-        self.data = load_annotation_file(self.filename)
-
-        # Ревизия сессии выдаётся вкладке. Получение новой ревизии
-        # инвалидирует предыдущую вкладку и предотвращает молчаливое
-        # затирание файла.
-        self.session_lock = threading.Lock()
-        self.active_session = None
-
-        # Защита от прихода старого асинхронного save после нового save.
-        self.last_client_seq = {}
-
-    def new_session(self):
-        token = secrets.token_urlsafe(24)
-        with self.session_lock:
-            self.active_session = token
-        return token
-
-    def check_session(self, token):
-        with self.session_lock:
-            return bool(token) and token == self.active_session
-
-    def get_item(self, index):
-        if index < 0 or index >= len(self.uid_by_index):
-            raise ValueError
-        uid = self.uid_by_index[index]
-        return normalize_item(self.data["items"].get(uid))
-
-    def save_item(self, index, item, token, client_seq):
-        if index < 0 or index >= len(self.uid_by_index):
-            raise ValueError
-        if not self.check_session(token):
-            raise PermissionError
-
-        try:
-            client_seq = int(client_seq)
-        except (TypeError, ValueError):
-            raise ValueError
-
-        with self.file_lock:
-            old_seq = self.last_client_seq.get(index, -1)
-            if client_seq < old_seq:
-                return False
-
-            checked = normalize_item(item)
-            uid = self.uid_by_index[index]
-
-            # Загружаем актуальный файл под блокировкой и меняем только UID
-            # текущей очереди. Все записи вне этой очереди сохраняются.
-            current = load_annotation_file(self.filename)
-            current["schema"] = SCHEMA
-            current["items"][uid] = checked
-            current["session_revision"] = self.data.get(
-                "session_revision", current.get("session_revision")
-            )
-            atomic_write(self.filename, current)
-            self.data = current
-            self.last_client_seq[index] = client_seq
-            return True
-
-    def image_bytes(self, index):
-        if index < 0 or index >= len(self.uid_by_index):
-            raise ValueError
-
-        uid = self.uid_by_index[index]
-        info = self.images.get(uid)
-        if not info:
-            raise FileNotFoundError
-
-        ds = pydicom.dcmread(info["path"])
-        array = ds.pixel_array.astype(np.float32)
-
-        if getattr(ds, "PhotometricInterpretation", "") == "MONOCHROME1":
-            array = np.max(array) - array
-
-        finite = np.isfinite(array)
-        if not finite.any():
-            array = np.zeros_like(array)
+        if self.filename.exists():
+            loaded = read_json(self.filename)
+            self.data = self.load_existing(loaded)
         else:
-            lo, hi = np.percentile(array[finite], (0.5, 99.5))
-            if hi <= lo:
-                lo = float(np.min(array[finite]))
-                hi = float(np.max(array[finite]))
-            if hi <= lo:
-                array = np.zeros_like(array)
-            else:
-                array = np.clip((array - lo) / (hi - lo), 0, 1) * 255
+            atomic_write(self.filename, self.data)
 
-        image = Image.fromarray(array.astype(np.uint8), mode="L")
-        out = BytesIO()
-        image.save(out, format="PNG")
-        return out.getvalue()
+        print(f"Снимков в очереди: {len(self.order)}.", flush=True)
+        print(f"Сохранение: {self.filename}", flush=True)
+
+    def load_existing(self, loaded):
+        if not isinstance(loaded, dict):
+            raise ValueError("Файл разметки должен быть объектом.")
+
+        if loaded.get("schema") != SCHEMA:
+            raise ValueError("Неподходящая схема файла разметки.")
+
+        items = loaded.get("items")
+        if not isinstance(items, dict):
+            raise ValueError("В файле нет items.")
+
+        revision = loaded.get("session_revision", 0)
+        if type(revision) is not int or revision < 0:
+            # Прежняя версия инструмента писала ревизию строкой-токеном.
+            # Ревизия защищает только от второй вкладки внутри сеанса, поэтому
+            # непонятное значение — повод начать счёт заново, а не терять файл.
+            revision = 0
+
+        session = loaded.get("session", {})
+        if not isinstance(session, dict):
+            raise ValueError("Некорректная сессия.")
+
+        order = session.get("order", self.order)
+        cursor = session.get("cursor", 0)
+
+        if order != self.order:
+            raise ValueError("Изменилась очередь снимков.")
+
+        if (
+            type(cursor) is not int
+            or not 0 <= cursor < len(self.order)
+        ):
+            raise ValueError("Некорректная позиция в очереди.")
+
+        clean_items = {}
+
+        for uid, value in items.items():
+            if uid not in self.order:
+                raise ValueError("В файле есть снимок вне очереди.")
+
+            # UID используется только как внутренний ключ файла и никогда
+            # не возвращается браузеру.
+            clean_items[uid] = validate_annotation(value)
+
+        return {
+            "schema": SCHEMA,
+            "session_revision": revision,
+            "items": clean_items,
+            "session": {
+                "order": list(self.order),
+                "cursor": cursor,
+            },
+        }
+
+    def annotation(self, uid):
+        raw = self.data["items"].get(uid)
+        if raw is None:
+            return blank_annotation()
+        return copy.deepcopy(raw)
+
+    def view(self, index):
+        with self.lock:
+            uid = self.order[index]
+            image = self.images[uid]
+            return {
+                "index": index,
+                "total": len(self.order),
+                "rows": image["rows"],
+                "cols": image["cols"],
+                "annotation": self.annotation(uid),
+                "finished": sum(
+                    value.get("status") in ("done", "skipped")
+                    for value in self.data["items"].values()
+                ),
+                "revision": self.data["session_revision"],
+            }
+
+    def save(self, raw):
+        with self.lock:
+            if not isinstance(raw, dict):
+                raise ValueError("Ожидался JSON-объект.")
+
+            revision = raw.get("revision")
+            if revision != self.data["session_revision"]:
+                raise Conflict(
+                    "Сессия изменена в другой вкладке. "
+                    "Перезагрузите страницу."
+                )
+
+            index = raw.get("index")
+            cursor = raw.get("cursor", index)
+
+            for value in (index, cursor):
+                if (
+                    type(value) is not int
+                    or not 0 <= value < len(self.order)
+                ):
+                    raise ValueError("Некорректная позиция очереди.")
+
+            mode = raw.get("mode")
+            if mode not in ("draft", "done", "skipped"):
+                raise ValueError("Некорректное действие сохранения.")
+
+            annotation = copy.deepcopy(raw.get("annotation"))
+            if not isinstance(annotation, dict):
+                raise ValueError("Нет разметки.")
+
+            annotation["status"] = mode
+            clean = validate_annotation(annotation, mode)
+
+            uid = self.order[index]
+            old = self.data["items"].get(uid)
+            if old:
+                clean["seconds"] = max(
+                    clean["seconds"],
+                    float(old.get("seconds", 0)),
+                )
+
+            clean["updated"] = now_iso()
+
+            updated = copy.deepcopy(self.data)
+            updated["items"][uid] = clean
+            updated["session"]["cursor"] = cursor
+            updated["session_revision"] += 1
+
+            atomic_write(self.filename, updated)
+            self.data = updated
+
+            return {
+                "revision": updated["session_revision"],
+                "finished": sum(
+                    value.get("status") in ("done", "skipped")
+                    for value in updated["items"].values()
+                ),
+            }
 
 
 HTML = r"""<!doctype html>
 <html lang="ru">
-<head>
 <meta charset="utf-8">
-<title>Разбор снимков</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DXA · ось позвоночника</title>
 <style>
-html,body{margin:0;height:100%;font-family:Arial,sans-serif;background:#202124;color:#eee}
-#layout{display:flex;height:100vh;overflow:hidden}
-#left{flex:1;position:relative;background:#111;overflow:hidden}
-canvas{display:block;width:100%;height:100%;cursor:crosshair}
-#right{width:370px;box-sizing:border-box;overflow:auto;padding:14px;background:#292a2d}
-label{display:block;margin:8px 0 4px}
-button,input,select,textarea{font:inherit}
-button{margin:2px;padding:6px 9px;background:#444;color:#fff;border:1px solid #777;border-radius:3px}
-button.active{background:#1769aa}
-textarea{width:100%;box-sizing:border-box;background:#1d1e20;color:#fff;border:1px solid #777}
-textarea{height:125px;resize:vertical}
-fieldset{border:1px solid #666;margin:10px 0;padding:8px}
-.small{font-size:12px;color:#bbb}
-#message{min-height:18px;color:#ffcc66}
-#counter{font-weight:bold}
-.pointrow{display:flex;gap:4px;align-items:center;margin:3px 0}
-.pointrow span{width:48px}
-.hint{line-height:1.4;font-size:12px;color:#ccc}
-hr{border:0;border-top:1px solid #555}
-input[type=range]{width:100%}
+:root{color-scheme:dark;font:14px system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:#101820;color:#e8eff8}
+header{padding:10px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+button,input,textarea,select{font:inherit}
+button,select{padding:7px;background:#253c51;color:white;border:1px solid #607990;border-radius:4px;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+input,textarea{background:#192b3b;color:white;border:1px solid #607990}
+textarea{width:100%;min-height:80px}
+main{display:grid;grid-template-columns:minmax(300px,1fr) 380px;height:calc(100vh - 65px)}
+section{display:flex;flex-direction:column;min-height:0;min-width:0}
+#tools{padding:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+#stage{position:relative;flex:1;min-height:200px;background:#030609;overflow:hidden}
+canvas{position:absolute;width:100%;height:100%;touch-action:none;cursor:crosshair}
+aside{padding:12px;overflow:auto;background:#1a2939}
+#progress{font-weight:bold}
+#position{font-size:16px;font-weight:bold}
+#points button{display:block;width:100%;text-align:left;margin:5px 0}
+#points button.active{outline:2px solid #ffe274;background:#3e5160}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0}
+.small{font-size:12px;line-height:1.5;color:#bfd1df}
+#error{color:#ffd0bf;white-space:pre-wrap}
+#coords{padding:6px;color:#bacddd}
+#save{margin-left:auto}
+input[type=range]{width:100px}
+#veil{position:absolute;inset:0;background:#101820c0;display:grid;place-items:center}
+#veil[hidden]{display:none}
+fieldset{border:1px solid #506d83;margin:10px 0;padding:8px}
+fieldset label{display:block;margin:6px 0}
+@media(max-width:800px){
+ main{display:flex;flex-direction:column;height:auto}
+ section{height:65vh}
+ aside{overflow:visible}
+}
 </style>
-</head>
-<body>
-<div id="layout">
-<div id="left"><canvas id="canvas"></canvas></div>
-<div id="right">
-  <div id="counter"></div>
-  <div id="message"></div>
 
-  <fieldset>
-    <legend>Точка</legend>
-    <div id="selected"></div>
-    <div id="pointButtons"></div>
-    <div>
-      Состояние:
-      <button data-state="visible">видимая</button>
-      <button data-state="uncertain">сомнительная</button>
-      <button data-state="not_visible">не видна</button>
-      <button data-state="out_of_frame">за кадром</button>
-    </div>
-    <div>
-      Уверенность:
-      <button data-confidence="3">3 — уверен</button>
-      <button data-confidence="2">2 — так себе</button>
-      <button data-confidence="1">1 — сомневаюсь</button>
-    </div>
-    <button id="deletePoint">Удалить координату</button>
-  </fieldset>
+<header>
+<b>DXA · ось позвоночника</b>
+<span id="progress"></span>
+<span id="timer"></span>
+<span id="save"></span>
+<button id="retry" hidden>Повторить сохранение</button>
+</header>
 
-  <fieldset>
-    <legend>Вердикт</legend>
-    <label><input type="radio" name="verdict" value="deviated"> ось отклонена</label>
-    <label><input type="radio" name="verdict" value="normal"> норма</label>
-    <label><input type="radio" name="verdict" value="cannot_decide"> не могу решить</label>
-  </fieldset>
-
-  <fieldset>
-    <legend>Признаки</legend>
-    <div id="features"></div>
-  </fieldset>
-
-  <label for="comment">Комментарий</label>
-  <textarea id="comment" maxlength="20000"
-    placeholder="Что именно выглядит наклонённым, относительно чего и что мешает решить?"></textarea>
-
-  <div>
-    <button id="prev">← Предыдущий</button>
-    <button id="next">Следующий →</button>
-    <button id="done">Завершить явно</button>
-    <button id="draft">Оставить черновиком</button>
-  </div>
-
-  <fieldset>
-    <legend>Изображение</legend>
-    <label>Яркость <input id="brightness" type="range" min="0.2" max="2.5" step="0.05" value="1"></label>
-    <label>Контраст <input id="contrast" type="range" min="0.2" max="3" step="0.05" value="1"></label>
-    <div class="small">Колесо — зум; ПКМ или Space+ЛКМ — панорама.</div>
-  </fieldset>
-
-  <fieldset class="hint">
-    <legend>Клавиши</legend>
-    1–6 — выбрать Th12/L1/L2/L3/L4/L5;<br>
-    T — верхняя пластинка, B — нижняя;<br>
-    V — видимая, U — сомнительная,<br>
-    N — не видна, O — за кадром;<br>
-    1/2/3 в режиме уверенности — уверенность;<br>
-    Delete/Backspace — удалить координату;<br>
-    ←/→ — предыдущий/следующий снимок;<br>
-    +/− — зум; Space — панорама;<br>
-    Ctrl+Enter — завершить явно.
-  </fieldset>
+<main>
+<section>
+<div id="tools">
+<button id="fit">Вписать</button>
+<button id="zoom3">×3</button>
+<label>Яркость <input id="brightness" type="range" min="30" max="250" value="100"></label>
+<label>Контраст <input id="contrast" type="range" min="30" max="350" value="100"></label>
+<button id="reset">Сброс</button>
 </div>
+<div id="stage">
+<canvas id="canvas"></canvas>
+<div id="veil">Загрузка…</div>
 </div>
+<div id="coords">Координаты исходного изображения</div>
+</section>
+
+<aside>
+<div id="position"></div>
+<div id="error"></div>
+
+<div class="row">
+<button id="prev">P · Назад</button>
+<button id="next">N · Далее</button>
+<button id="skip">S · Пропустить</button>
+</div>
+
+<div id="points"></div>
+
+<div class="row">
+<button data-state="visible">V · видна</button>
+<button data-state="not_visible">X · не видна</button>
+<button data-state="out_of_frame">O · вне кадра</button>
+<button data-state="uncertain">? · не уверена</button>
+</div>
+
+<label>Уверенность:
+<select id="confidence">
+<option value="1" selected>1 — сомневаюсь</option>
+<option value="2">2 — так себе</option>
+<option value="3">3 — уверен</option>
+</select>
+</label>
+
+<div class="row">
+<button id="delete">D · Удалить точку</button>
+</div>
+
+<fieldset>
+<legend>Вердикт</legend>
+<label><input type="radio" name="verdict" value="axis_deviated"> ось отклонена</label>
+<label><input type="radio" name="verdict" value="normal"> норма</label>
+<label><input type="radio" name="verdict" value="cannot_decide"> не могу решить</label>
+</fieldset>
+
+<fieldset>
+<legend>Признаки</legend>
+<div id="features"></div>
+</fieldset>
+
+<label>Комментарий
+<textarea id="comment" maxlength="20000"
+ placeholder="Что именно выглядит наклонённым и относительно чего?"></textarea>
+</label>
+
+<p class="small">
+1–6 — выбрать позвонок. T/B — верхняя или нижняя точка.
+Shift+1–3 или NumPad1–3 — уверенность.
+ЛКМ — поставить точку; следующая точка выбирается автоматически.
+Уже поставленную точку можно перетащить мышью.
+<br>
+Колесо — зум; ПКМ или Space+мышь — панорама.
+<br>
+V — видна, X — не видна, O — вне кадра, ? — не уверена.
+D — удалить точку, P — предыдущий снимок, N — следующий,
+S — пропустить.
+<br>
+После последней точки выбор не зацикливается.
+Координаты при X и O запрещены.
+Тонкие вертикаль и горизонталь показывают центр кадра.
+</p>
+</aside>
+</main>
+
 <script>
 "use strict";
 
-const features = [
-  ["whole_column_tilted","наклонён весь столб"],
-  ["lumbar_only_tilted","наклонён только поясничный отдел"],
-  ["pelvis_oblique","таз перекошен"],
-  ["column_shifted_sideways","столб смещён вбок"],
-  ["vertebrae_rotated","позвонки повёрнуты вокруг своей оси"],
-  ["column_cut_by_frame","кадр обрезает столб"],
-  ["uncertain","сомневаюсь"]
-];
-const vertebrae = ["Th12","L1","L2","L3","L4","L5"];
-const pointNames = ["top","bottom"];
+const TOKEN=__TOKEN__;
+const vertebrae=["Th12","L1","L2","L3","L4","L5"];
+const levels=["top","bottom"];
+const pointNames=[];
+for(const v of vertebrae)for(const l of levels)pointNames.push(v+"_"+l);
 
-let index = 0, total = 0, item = null, sessionRevision = null;
-let selectedV = 0, selectedP = "top", clientSeq = 0;
-let image = new Image(), imageReady = false;
-// Один флаг на панораму и на перетаскивание точки приводил к тому, что захват
-// точки двигал всё изображение. Режим жеста теперь различается явно.
-let zoom = 1, panX = 0, panY = 0, dragMode = null, dragX = 0, dragY = 0;
-let brightness = 1, contrast = 1, commentTimer = null;
+let current=null, ann=null, image=null;
+let index=0, selected=0, revision=0, finished=0;
+let W=1,H=1,zoom=1,ox=0,oy=0;
+let gesture=null,space=false,busy=true;
+let pending=0,failed=false,dirty=false,conflict=false;
+let tail=Promise.resolve(),last=performance.now();
 
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-const $ = id => document.getElementById(id);
+const $=id=>document.getElementById(id);
+const clone=value=>JSON.parse(JSON.stringify(value));
 
-function timeoutFetch(url, options={}) {
-  // У каждого запроса есть собственный AbortController и таймаут 15 секунд.
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  options.signal = controller.signal;
-  return fetch(url, options).finally(() => clearTimeout(timer));
-}
+function error(text=""){ $("error").textContent=text; }
 
-function showMessage(s) { $("message").textContent = s || ""; }
-
-async function getJSON(url, options={}) {
-  const r = await timeoutFetch(url, options);
-  if (!r.ok) throw new Error("network");
-  return r.json();
-}
-
-function selectedPoint() {
-  return item.points[vertebrae[selectedV]][selectedP];
-}
-
-function pointLabel(v, p) {
-  return vertebrae[v] + " " + (p === "top" ? "верх" : "низ");
-}
-
-function renderControls() {
-  $("selected").textContent = "Выбрано: " + pointLabel(selectedV, selectedP);
-  document.querySelectorAll("[data-state]").forEach(b => {
-    b.classList.toggle("active", b.dataset.state === selectedPoint().state);
+async function api(url,options={}){
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),15000);
+ try{
+  const response=await fetch(url,{
+   cache:"no-store",
+   ...options,
+   signal:controller.signal,
+   headers:{
+    "X-Axis-Token":TOKEN,
+    "Content-Type":"application/json",
+    ...(options.headers||{})
+   }
   });
-  document.querySelectorAll("[data-confidence]").forEach(b => {
-    b.classList.toggle("active", Number(b.dataset.confidence) === selectedPoint().confidence);
-  });
-
-  document.querySelectorAll("input[name=verdict]").forEach(x => {
-    x.checked = x.value === item.verdict;
-  });
-
-  const box = $("features");
-  box.innerHTML = "";
-  features.forEach(([key, text]) => {
-    const lab = document.createElement("label");
-    lab.innerHTML = `<input type="checkbox" data-feature="${key}"> ${text}`;
-    lab.querySelector("input").checked = item.features.includes(key);
-    box.appendChild(lab);
-  });
-  $("comment").value = item.comment || "";
-  $("counter").textContent =
-    `Снимок ${index + 1} из ${total}` +
-    (item.status === "done" ? " — завершён" : " — черновик");
+  let data;
+  try{data=await response.json()}
+  catch(e){throw Error("Некорректный ответ сервера")}
+  if(!response.ok){
+   const e=Error(data.error||`HTTP ${response.status}`);
+   e.conflict=response.status===409;
+   throw e;
+  }
+  return data;
+ }catch(e){
+  if(e.name==="AbortError")throw Error("Запрос превысил таймаут 15 секунд.");
+  throw e;
+ }finally{
+  clearTimeout(timer);
+ }
 }
 
-function imageTransform() {
-  const iw = image.naturalWidth || 1, ih = image.naturalHeight || 1;
-  const scale = Math.min(canvas.width / iw, canvas.height / ih) * zoom;
-  return {
-    scale,
-    ox: (canvas.width - iw * scale) / 2 + panX,
-    oy: (canvas.height - ih * scale) / 2 + panY
-  };
+function account(){
+ const now=performance.now();
+ if(ann&&!busy&&!document.hidden&&document.hasFocus()){
+  const dt=Math.max(0,(now-last)/1000);
+  ann.seconds+=dt;
+  if(dt>0)dirty=true;
+ }
+ last=now;
 }
 
-function imageToScreen(x, y) {
-  const t = imageTransform();
-  return [t.ox + x * image.naturalWidth * t.scale,
-          t.oy + y * image.naturalHeight * t.scale];
+function statusMode(){
+ if(ann.status==="skipped")return "skipped";
+ return pointNames.every(name=>{
+  const [v,l]=name.split("_");
+  return ann.points[v][l].state;
+ }) ? "done" : "draft";
 }
 
-function screenToImage(x, y) {
-  const t = imageTransform();
-  return [
-    (x - t.ox) / (image.naturalWidth * t.scale),
-    (y - t.oy) / (image.naturalHeight * t.scale)
-  ];
+function saveStatus(){
+ $("save").textContent=failed?"НЕ СОХРАНЕНО":
+   pending?"Сохранение…":dirty?"Изменения в памяти":"Сохранено ✓";
+ $("retry").hidden=!failed||conflict;
 }
 
-function draw() {
-  const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-  if (!imageReady) return;
+function queueSave(cursor=index,requestedMode=null){
+ if(!ann)return Promise.resolve(false);
 
-  const t = imageTransform();
-  ctx.save();
-  ctx.filter = `brightness(${brightness}) contrast(${contrast})`;
-  ctx.drawImage(image, t.ox, t.oy,
-    image.naturalWidth * t.scale, image.naturalHeight * t.scale);
-  ctx.restore();
+ account();
+ const snapshot=clone(ann);
+ const capturedIndex=index;
+ const capturedMode=requestedMode||statusMode();
 
-  // Тонкие вертикальная и горизонтальная линии края кадра.
-  ctx.strokeStyle = "rgba(80,220,255,.75)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(t.ox, 0); ctx.lineTo(t.ox, h);
-  ctx.moveTo(t.ox + image.naturalWidth*t.scale, 0);
-  ctx.lineTo(t.ox + image.naturalWidth*t.scale, h);
-  ctx.moveTo(0, t.oy); ctx.lineTo(w, t.oy);
-  ctx.moveTo(0, t.oy + image.naturalHeight*t.scale);
-  ctx.lineTo(w, t.oy + image.naturalHeight*t.scale);
-  ctx.stroke();
+ pending++;
+ saveStatus();
 
-  const pts = [];
-  vertebrae.forEach((v, vi) => pointNames.forEach(p => {
-    const q = item.points[v][p];
-    if (q.x !== null && q.y !== null &&
-        (q.state === "visible" || q.state === "uncertain")) {
-      const [sx, sy] = imageToScreen(q.x, q.y);
-      pts.push([sx, sy, pointLabel(vi, p), vi, p]);
-    }
-  }));
-
-  // Линии соединяют поставленные точки в порядке сверху вниз.
-  ctx.strokeStyle = "#ffdf4d";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  let started = false;
-  pts.forEach(([x,y]) => {
-    if (!started) { ctx.moveTo(x,y); started = true; }
-    else ctx.lineTo(x,y);
-  });
-  ctx.stroke();
-
-  pts.forEach(([x,y,label,vi,p]) => {
-    const selected = vi === selectedV && p === selectedP;
-    ctx.fillStyle = selected ? "#ff3333" : "#00ff88";
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(x,y,selected ? 7 : 5,0,Math.PI*2);
-    ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#fff";
-    ctx.font = "13px Arial";
-    ctx.fillText(label, x+8, y-7);
-  });
-}
-
-function resize() {
-  canvas.width = canvas.clientWidth * devicePixelRatio;
-  canvas.height = canvas.clientHeight * devicePixelRatio;
-  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-  // После задания CSS-пиксельного transform используем CSS-размеры.
-  canvas.width = canvas.clientWidth;
-  canvas.height = canvas.clientHeight;
-  draw();
-}
-window.addEventListener("resize", resize);
-
-async function loadIndex(n) {
-  if (n < 0) n = 0;
-  if (n >= total) n = total - 1;
-  index = n;
-  const data = await getJSON("/api/state/" + index);
-  item = data.item;
-  imageReady = false;
-  image = new Image();
-  image.onload = () => { imageReady = true; resize(); };
-  image.onerror = () => showMessage("Не удалось загрузить изображение");
-  image.src = "/api/image/" + index;
-  renderControls();
-  draw();
-}
-
-function snapshot() {
-  return JSON.parse(JSON.stringify(item));
-}
-
-function save(reason="") {
-  const capturedIndex = index;
-  const capturedRevision = sessionRevision;
-  const capturedItem = snapshot();
-  const capturedSeq = ++clientSeq;
-
-  // Все значения, включая индекс снимка и ревизию, захвачены до async-запроса.
-  // Поэтому переход на другой снимок не может отправить туда старую разметку.
-  timeoutFetch("/api/save", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      index: capturedIndex,
-      revision: capturedRevision,
-      seq: capturedSeq,
-      item: capturedItem
+ tail=tail.then(async()=>{
+  if(failed)return false;
+  try{
+   const result=await api("/api/save",{
+    method:"POST",
+    body:JSON.stringify({
+     index:capturedIndex,
+     cursor,
+     mode:capturedMode,
+     annotation:snapshot,
+     revision
     })
-  }).then(r => {
-    if (!r.ok) throw new Error("save");
-    return r.json();
-  }).catch(e => {
-    showMessage(e.name === "AbortError" ? "Сохранение прервано по таймауту"
-                                        : "Сохранение не выполнено");
-  });
+   });
+   revision=result.revision;
+   finished=result.finished;
+   return true;
+  }catch(e){
+   failed=true;
+   conflict=!!e.conflict;
+   error(e.message+" Изменения этой вкладки сохранены в памяти.");
+   return false;
+  }
+ }).finally(()=>{
+  pending--;
+  if(!pending&&!failed)dirty=false;
+  saveStatus();
+  renderHeader();
+ });
+
+ return tail;
 }
 
-function mutate(fn) {
-  fn();
-  renderControls();
+function autoQueue(){
+ const mode=(ann.status==="done"||ann.status==="skipped")
+  ?ann.status:"draft";
+ return queueSave(index,mode);
+}
+
+function mutate(fn){
+ if(!ann||busy||failed)return;
+ account();
+ fn();
+ if(ann.status!=="done"&&ann.status!=="skipped")ann.status="draft";
+ dirty=true;
+ render();
+ autoQueue();
+}
+
+function selectedParts(){
+ return pointNames[selected].split("_");
+}
+
+function choose(number){
+ selected=Math.max(0,Math.min(pointNames.length-1,number));
+ render();
+}
+
+function pointValue(){
+ const [v,l]=selectedParts();
+ return ann.points[v][l];
+}
+
+function setState(state){
+ if(!ann||busy||failed)return;
+
+ const point=pointValue();
+ if(state==="visible"&&!Number.isFinite(point.x)){
+  error("Для visible поставьте координату щелчком по изображению.");
+  render();
+  return;
+ }
+
+ mutate(()=>{
+  const result={
+   state,
+   confidence:point.confidence||Number($("confidence").value)||1
+  };
+  if(
+   (state==="visible"||state==="uncertain") &&
+   Number.isFinite(point.x)&&Number.isFinite(point.y)
+  ){
+   result.x=point.x;
+   result.y=point.y;
+  }
+
+  const [v,l]=selectedParts();
+  ann.points[v][l]=result;
+ });
+}
+
+function setConfidence(value){
+ if(!ann||busy||failed)return;
+
+ const [v,l]=selectedParts();
+ if(ann.points[v][l]){
+  mutate(()=>ann.points[v][l].confidence=value);
+ }
+}
+
+function renderHeader(){
+ $("progress").textContent=current?
+  `Завершено ${finished}/${current.total}`:"";
+ $("position").textContent=current?
+  `Показ ${index+1} из ${current.total}`:"";
+ $("timer").textContent=ann?
+  `${Math.floor(ann.seconds)} с`:"";
+}
+
+function renderPoints(){
+ const container=$("points");
+ container.replaceChildren();
+
+ pointNames.forEach((name,i)=>{
+  const [v,l]=name.split("_");
+  const p=ann.points[v][l];
+  const button=document.createElement("button");
+  button.className=i===selected?"active":"";
+  button.textContent=
+   `${i<12?Math.floor(i/2)+1:""} · ${v} ${l} — `+
+   `${p.state} · ${p.confidence}`;
+  button.onclick=()=>choose(i);
+  container.append(button);
+ });
+}
+
+function renderFeatures(){
+ const container=$("features");
+ container.replaceChildren();
+
+ for(const feature of [
+  "whole_column_tilted",
+  "lumbar_only_tilted",
+  "pelvis_tilted",
+  "column_shifted_sideways",
+  "vertebrae_rotated",
+  "column_cut_off",
+  "uncertain"
+ ]){
+  const label=document.createElement("label");
+  const input=document.createElement("input");
+  input.type="checkbox";
+  input.value=feature;
+  input.checked=ann.features.includes(feature);
+  input.onchange=()=>{
+   mutate(()=>{
+    const values=new Set(ann.features);
+    if(input.checked)values.add(feature);
+    else values.delete(feature);
+    ann.features=[...values];
+   });
+  };
+  label.append(input," ",{
+   whole_column_tilted:"наклонён весь столб",
+   lumbar_only_tilted:"наклонён только поясничный отдел",
+   pelvis_tilted:"таз перекошен",
+   column_shifted_sideways:"столб смещён вбок",
+   vertebrae_rotated:"позвонки повёрнуты вокруг своей оси",
+   column_cut_off:"кадр обрезает столб",
+   uncertain:"сомневаюсь"
+  }[feature]);
+  container.append(label);
+ }
+}
+
+function render(){
+ renderHeader();
+ saveStatus();
+ renderPoints();
+ renderFeatures();
+
+ $("confidence").value=pointValue().confidence||1;
+ document.querySelectorAll("[data-state]").forEach(button=>{
+  button.style.outline=
+   button.dataset.state===pointValue().state
+    ?"2px solid #ffe274":"none";
+ });
+
+ document.querySelectorAll("[name=verdict]").forEach(input=>{
+  input.checked=input.value===ann.verdict;
+ });
+
+ $("comment").value=ann.comment;
+ draw();
+}
+
+function draw(){
+ const context=$("canvas").getContext("2d");
+ context.clearRect(0,0,W,H);
+ if(!image)return;
+
+ context.save();
+ context.filter=
+  `brightness(${$("brightness").value}%) `+
+  `contrast(${$("contrast").value}%)`;
+ context.imageSmoothingEnabled=false;
+ context.drawImage(
+  image,ox,oy,current.cols*zoom,current.rows*zoom
+ );
+ context.restore();
+
+ // Центральные вертикаль и горизонталь кадра.
+ const centerX=ox+current.cols*zoom/2;
+ const centerY=oy+current.rows*zoom/2;
+
+ context.strokeStyle="#91a9b8";
+ context.lineWidth=1;
+ context.setLineDash([5,5]);
+ context.beginPath();
+ context.moveTo(centerX,oy);
+ context.lineTo(centerX,oy+current.rows*zoom);
+ context.moveTo(ox,centerY);
+ context.lineTo(ox+current.cols*zoom,centerY);
+ context.stroke();
+ context.setLineDash([]);
+
+ if(!ann)return;
+
+ context.font="bold 13px system-ui";
+
+ pointNames.forEach((name,i)=>{
+  const [v,l]=name.split("_");
+  const p=ann.points[v][l];
+  if(!Number.isFinite(p.x)||!Number.isFinite(p.y))return;
+
+  const x=ox+p.x*current.cols*zoom;
+  const y=oy+p.y*current.rows*zoom;
+
+  context.strokeStyle=i===selected?
+   "#fff077":p.state==="uncertain"?"#ff8ea4":"#71ffc4";
+  context.fillStyle=context.strokeStyle;
+  context.lineWidth=2;
+
+  context.beginPath();
+  context.arc(x,y,5,0,2*Math.PI);
+  context.stroke();
+
+  context.beginPath();
+  context.moveTo(x-9,y);context.lineTo(x+9,y);
+  context.moveTo(x,y-9);context.lineTo(x,y+9);
+  context.stroke();
+
+  context.fillText(`${v} ${l}`,x+10,y-7);
+ });
+}
+
+function resize(){
+ const rect=$("stage").getBoundingClientRect();
+ const d=devicePixelRatio||1;
+ const canvas=$("canvas");
+
+ W=rect.width;H=rect.height;
+ canvas.width=Math.round(W*d);
+ canvas.height=Math.round(H*d);
+ canvas.getContext("2d").setTransform(d,0,0,d,0,0);
+ draw();
+}
+
+function center(scale){
+ if(!current)return;
+ zoom=scale;
+ ox=(W-current.cols*zoom)/2;
+ oy=(H-current.rows*zoom)/2;
+ draw();
+}
+
+function fit(){
+ if(!current)return;
+ center(Math.max(
+  .01,
+  Math.min(
+   (W-20)/current.cols,
+   (H-20)/current.rows
+  )
+ ));
+}
+
+function pointer(event){
+ const rect=$("canvas").getBoundingClientRect();
+ return {
+  x:event.clientX-rect.left,
+  y:event.clientY-rect.top
+ };
+}
+
+function nativePoint(point){
+ return {
+  x:(point.x-ox)/(current.cols*zoom),
+  y:(point.y-oy)/(current.rows*zoom)
+ };
+}
+
+function put(point){
+ if(!ann||busy||failed||!image)return;
+
+ const q=nativePoint(point);
+ if(q.x<0||q.x>1||q.y<0||q.y>1)return;
+
+ const [v,l]=selectedParts();
+ const currentPoint=ann.points[v][l];
+ const state=currentPoint.state;
+ const confidence=Number($("confidence").value)||1;
+
+ if(state==="not_visible"||state==="out_of_frame"){
+  error("Для постановки координаты выберите V или ?.");
+  return;
+ }
+
+ error();
+
+ mutate(()=>{
+  ann.points[v][l]={
+   x:q.x,
+   y:q.y,
+   state:state==="uncertain"?"uncertain":"visible",
+   confidence
+  };
+ });
+
+ if(selected<pointNames.length-1)choose(selected+1);
+}
+
+function pointAt(point){
+ if(!ann)return -1;
+
+ let best=-1;
+ let distance=10;
+
+ pointNames.forEach((name,i)=>{
+  const [v,l]=name.split("_");
+  const p=ann.points[v][l];
+  if(!Number.isFinite(p.x)||!Number.isFinite(p.y))return;
+
+  const x=ox+p.x*current.cols*zoom;
+  const y=oy+p.y*current.rows*zoom;
+  const d=Math.hypot(x-point.x,y-point.y);
+
+  if(d<distance){
+   distance=d;
+   best=i;
+  }
+ });
+
+ return best;
+}
+
+function dragTo(point){
+ if(!ann||busy||failed)return;
+
+ const q=nativePoint(point);
+ if(q.x<0||q.x>1||q.y<0||q.y>1)return;
+
+ const [v,l]=selectedParts();
+ const p=ann.points[v][l];
+
+ if(!Number.isFinite(p.x))return;
+
+ p.x=q.x;
+ p.y=q.y;
+ dirty=true;
+ draw();
+}
+
+async function load(target){
+ busy=true;
+ $("veil").hidden=false;
+ image=null;
+ gesture=null;
+ draw();
+
+ try{
+  const data=await api("/api/item/"+target);
+  const picture=new Image();
+
+  await new Promise((resolve,reject)=>{
+   picture.onload=resolve;
+   picture.onerror=()=>reject(Error("Не удалось загрузить изображение."));
+   picture.src="/api/png/"+target+"?t="+encodeURIComponent(TOKEN);
+  });
+
+  if(
+   picture.naturalWidth!==data.cols||
+   picture.naturalHeight!==data.rows
+  ){
+   throw Error("Размер изображения не совпадает с индексом.");
+  }
+
+  current=data;
+  index=target;
+  ann=data.annotation;
+  revision=data.revision;
+  finished=data.finished;
+  image=picture;
+  failed=false;
+  dirty=false;
+  busy=false;
+  last=performance.now();
+  $("veil").hidden=true;
+
+  const firstUnset=pointNames.findIndex(name=>{
+   const [v,l]=name.split("_");
+   return !Number.isFinite(ann.points[v][l].x);
+  });
+
+  selected=firstUnset<0?pointNames.length-1:firstUnset;
+  resize();
+  fit();
+  render();
+ }catch(e){
+  error(e.message);
+  $("veil").textContent="Ошибка загрузки. Перезагрузите страницу.";
+ }
+}
+
+async function go(delta,skip=false){
+ if(!ann||busy||failed)return;
+
+ account();
+ busy=true;
+
+ const target=Math.max(
+  0,
+  Math.min(current.total-1,index+delta)
+ );
+ const requested=skip?"skipped":statusMode();
+
+ if(skip)ann.status="skipped";
+
+ const ok=await queueSave(target,requested);
+
+ if(!ok||failed){
+  busy=false;
+  return;
+ }
+
+ if(target===index){
+  busy=false;
+  ann.status=requested;
+  render();
+  error(
+   requested==="draft"
+    ?"Черновик сохранён."
+    :"Сохранено. Это край очереди."
+  );
+  return;
+ }
+
+ await load(target);
+}
+
+$("canvas").oncontextmenu=event=>event.preventDefault();
+
+$("canvas").onpointerdown=event=>{
+ if(!ann||busy||failed||!image)return;
+
+ const point=pointer(event);
+
+ if(event.button===2||(event.button===0&&space)){
+  gesture={
+   kind:"pan",
+   point,
+   ox,
+   oy,
+   id:event.pointerId
+  };
+ }else if(event.button===0){
+  const hit=pointAt(point);
+  if(hit>=0){
+   choose(hit);
+   gesture={kind:"drag",point,id:event.pointerId};
+  }else{
+   gesture={kind:"point",point,id:event.pointerId};
+  }
+ }
+
+ if(gesture){
+  $("canvas").setPointerCapture(event.pointerId);
+  event.preventDefault();
+ }
+};
+
+$("canvas").onpointermove=event=>{
+ const point=pointer(event);
+ const q=nativePoint(point);
+
+ $("coords").textContent=
+  `Нормированные координаты: x=${q.x.toFixed(3)}, y=${q.y.toFixed(3)}`;
+
+ if(gesture?.kind==="pan"){
+  ox=gesture.ox+point.x-gesture.point.x;
+  oy=gesture.oy+point.y-gesture.point.y;
   draw();
-  save();
+ }else if(gesture?.kind==="drag"){
+  dragTo(point);
+ }
+};
+
+$("canvas").onpointerup=event=>{
+ if(!gesture)return;
+
+ const activeGesture=gesture;
+ gesture=null;
+
+ if(activeGesture.kind==="point"){
+  const point=pointer(event);
+  if(
+   Math.hypot(
+    point.x-activeGesture.point.x,
+    point.y-activeGesture.point.y
+   )<6
+  ){
+   put(point);
+  }
+ }else if(activeGesture.kind==="drag"){
+  dragTo(pointer(event));
+  mutate(()=>{});
+ }
+};
+
+$("canvas").onpointercancel=()=>{gesture=null};
+
+$("canvas").addEventListener("wheel",event=>{
+ event.preventDefault();
+ if(!image)return;
+
+ const point=pointer(event);
+ const before=nativePoint(point);
+
+ zoom=Math.max(
+  .01,
+  Math.min(30,zoom*Math.exp(-event.deltaY*.0015))
+ );
+
+ ox=point.x-before.x*current.cols*zoom;
+ oy=point.y-before.y*current.rows*zoom;
+ draw();
+},{passive:false});
+
+$("prev").onclick=()=>go(-1);
+$("next").onclick=()=>go(1);
+$("skip").onclick=()=>go(1,true);
+
+$("delete").onclick=()=>{
+ mutate(()=>{
+  const [v,l]=selectedParts();
+  ann.points[v][l]={
+   state:"not_visible",
+   confidence:Number($("confidence").value)||1
+  };
+ });
+};
+
+$("fit").onclick=fit;
+$("zoom3").onclick=()=>center(3);
+
+$("brightness").oninput=draw;
+$("contrast").oninput=draw;
+
+$("reset").onclick=()=>{
+ $("brightness").value=100;
+ $("contrast").value=100;
+ draw();
+};
+
+$("confidence").onchange=()=>{
+ setConfidence(Number($("confidence").value));
+};
+
+document.querySelectorAll("[data-state]").forEach(button=>{
+ button.onclick=()=>setState(button.dataset.state);
+});
+
+document.querySelectorAll("[name=verdict]").forEach(input=>{
+ input.onchange=()=>{
+  mutate(()=>{ann.verdict=input.value});
+ };
+});
+
+$("comment").oninput=()=>{
+ mutate(()=>{ann.comment=$("comment").value});
+};
+
+$("retry").onclick=async()=>{
+ if(conflict||pending||!ann)return;
+ failed=false;
+ error();
+ await autoQueue();
+ render();
+};
+
+document.onkeydown=event=>{
+ if(
+  event.target.matches("input,textarea,select")||
+  event.ctrlKey||event.altKey||event.metaKey
+ )return;
+
+ if(event.code==="Space"){
+  space=true;
+  event.preventDefault();
+  return;
+ }
+
+ if(event.repeat)return;
+
+ if(
+  /^Numpad[1-3]$/.test(event.code)||
+  (event.shiftKey&&/^Digit[1-3]$/.test(event.code))
+ ){
+  event.preventDefault();
+  setConfidence(Number(event.code.slice(-1)));
+  return;
+ }
+
+ if(!event.shiftKey&&/^Digit[1-6]$/.test(event.code)){
+  event.preventDefault();
+  choose((Number(event.code.slice(-1))-1)*2);
+  return;
+ }
+
+ if(event.code==="KeyT"){
+  event.preventDefault();
+  choose(Math.floor(selected/2)*2);
+  return;
+ }
+
+ if(event.code==="KeyB"){
+  event.preventDefault();
+  choose(Math.floor(selected/2)*2+1);
+  return;
+ }
+
+ if(event.key==="?"){
+  event.preventDefault();
+  setState("uncertain");
+  return;
+ }
+
+ const actions={
+  KeyV:()=>setState("visible"),
+  KeyX:()=>setState("not_visible"),
+  KeyO:()=>setState("out_of_frame"),
+  KeyN:()=>go(1),
+  KeyP:()=>go(-1),
+  KeyS:()=>go(1,true),
+  KeyD:()=>$("delete").click()
+ };
+
+ if(actions[event.code]){
+  event.preventDefault();
+  actions[event.code]();
+ }
+};
+
+document.onkeyup=event=>{
+ if(event.code==="Space")space=false;
+};
+
+window.addEventListener("blur",()=>{
+ account();
+ space=false;
+ gesture=null;
+ if(ann&&!busy&&!failed)autoQueue();
+});
+
+window.addEventListener("focus",()=>{
+ last=performance.now();
+});
+
+document.addEventListener("visibilitychange",()=>{
+ last=performance.now();
+ if(document.hidden&&ann&&!busy&&!failed)autoQueue();
+});
+
+window.addEventListener("beforeunload",event=>{
+ if(pending||dirty||failed){
+  event.preventDefault();
+  event.returnValue="";
+ }
+});
+
+new ResizeObserver(resize).observe($("stage"));
+
+setInterval(()=>{
+ account();
+ renderHeader();
+ if(!pending&&!failed)saveStatus();
+},1000);
+
+setInterval(()=>{
+ if(ann&&!busy&&!failed)autoQueue();
+},10000);
+
+async function boot(){
+ try{
+  const session=await api("/api/session");
+  revision=session.revision;
+  await load(session.cursor);
+ }catch(e){
+  error(e.message);
+ }
 }
 
-document.querySelectorAll("[data-state]").forEach(b => {
-  b.onclick = () => mutate(() => {
-    const q = selectedPoint();
-    q.state = b.dataset.state;
-    if (q.state === "not_visible" || q.state === "out_of_frame") {
-      q.x = null; q.y = null;
-    }
-  });
-});
-document.querySelectorAll("[data-confidence]").forEach(b => {
-  b.onclick = () => mutate(() => {
-    selectedPoint().confidence = Number(b.dataset.confidence);
-  });
-});
-$("deletePoint").onclick = () => mutate(() => {
-  const q = selectedPoint();
-  q.x = null; q.y = null;
-  q.state = "not_visible";
-});
-
-document.querySelectorAll("input[name=verdict]").forEach(x => {
-  x.onchange = () => mutate(() => { item.verdict = x.value; });
-});
-$("features").onclick = e => {
-  if (!e.target.dataset.feature) return;
-  mutate(() => {
-    const key = e.target.dataset.feature;
-    item.features = e.target.checked
-      ? [...new Set([...item.features, key])]
-      : item.features.filter(x => x !== key);
-  });
-};
-$("comment").oninput = () => {
-  item.comment = $("comment").value.slice(0,20000);
-  clearTimeout(commentTimer);
-  commentTimer = setTimeout(() => save(), 250);
-};
-
-$("prev").onclick = () => loadIndex(index - 1);
-$("next").onclick = () => loadIndex(index + 1);
-$("done").onclick = () => mutate(() => { item.status = "done"; });
-$("draft").onclick = () => mutate(() => { item.status = "draft"; });
-
-$("brightness").oninput = e => { brightness = Number(e.target.value); draw(); };
-$("contrast").oninput = e => { contrast = Number(e.target.value); draw(); };
-
-canvas.oncontextmenu = e => e.preventDefault();
-canvas.onmousedown = e => {
-  if (e.button === 2 || e.button === 0 && keys.has(" ")) {
-    dragMode = "pan"; dragX = e.clientX; dragY = e.clientY;
-    return;
-  }
-  if (e.button !== 0 || !imageReady) return;
-
-  const r = canvas.getBoundingClientRect();
-  const sx = e.clientX-r.left, sy = e.clientY-r.top;
-
-  // Поиск ближайшей точки явно начинается с -1. Пустой набор возвращает
-  // "ничего", а не первый элемент.
-  let best = -1, bestDist = Infinity;
-  vertebrae.forEach((v, vi) => pointNames.forEach(p => {
-    const q = item.points[v][p];
-    if (q.x === null || q.y === null) return;
-    const [x,y] = imageToScreen(q.x,q.y);
-    const d = Math.hypot(x-sx,y-sy);
-    if (d < bestDist) {
-      bestDist = d;
-      best = vi*2 + (p === "bottom" ? 1 : 0);
-    }
-  }));
-  if (best >= 0 && bestDist <= 10) {
-    selectedV = Math.floor(best/2);
-    selectedP = best % 2 ? "bottom" : "top";
-    renderControls(); draw();
-    dragMode = "point"; dragX=e.clientX; dragY=e.clientY;
-    return;
-  }
-
-  const q = selectedPoint();
-  if (q.state !== "visible" && q.state !== "uncertain") return;
-  const [x,y] = screenToImage(sx,sy);
-  if (x < 0 || x > 1 || y < 0 || y > 1) return;
-  mutate(() => { q.x=x; q.y=y; });
-};
-window.onmouseup = () => {
-  // Перенос точки записывается один раз, в конце жеста, а не на каждом движении.
-  if (dragMode === "point") save();
-  dragMode = null;
-};
-window.onmousemove = e => {
-  if (!dragMode) return;
-  if (dragMode === "pan") {
-    panX += e.clientX-dragX; panY += e.clientY-dragY;
-    dragX=e.clientX; dragY=e.clientY; draw();
-    return;
-  }
-  const q = selectedPoint();
-  if (!q || q.state !== "visible" && q.state !== "uncertain") return;
-  const r = canvas.getBoundingClientRect();
-  const [x,y] = screenToImage(e.clientX-r.left, e.clientY-r.top);
-  if (x < 0 || x > 1 || y < 0 || y > 1) return;
-  q.x = x; q.y = y; draw();
-};
-canvas.onwheel = e => {
-  e.preventDefault();
-  zoom = Math.max(.2, Math.min(12, zoom * (e.deltaY < 0 ? 1.12 : .89)));
-  draw();
-};
-
-let keys = new Set();
-window.onkeydown = e => {
-  keys.add(e.key);
-  if (e.key === " " || e.key === "ArrowLeft" || e.key === "ArrowRight")
-    e.preventDefault();
-
-  if (/^[1-6]$/.test(e.key)) {
-    selectedV = Number(e.key)-1;
-    // Цифры выбирают позвонок; состояние уверенности меняется кнопками
-    // и не смешивается с выбором позвонка.
-    renderControls(); draw();
-  } else if (e.key.toLowerCase() === "t") {
-    selectedP="top"; renderControls(); draw();
-  } else if (e.key.toLowerCase() === "b") {
-    selectedP="bottom"; renderControls(); draw();
-  } else if (e.key.toLowerCase() === "v") {
-    document.querySelector('[data-state="visible"]').click();
-  } else if (e.key.toLowerCase() === "u") {
-    document.querySelector('[data-state="uncertain"]').click();
-  } else if (e.key.toLowerCase() === "n") {
-    document.querySelector('[data-state="not_visible"]').click();
-  } else if (e.key.toLowerCase() === "o") {
-    document.querySelector('[data-state="out_of_frame"]').click();
-  } else if (e.key === "Delete" || e.key === "Backspace") {
-    $("deletePoint").click();
-  } else if (e.key === "ArrowLeft") {
-    loadIndex(index-1);
-  } else if (e.key === "ArrowRight") {
-    loadIndex(index+1);
-  } else if (e.key === "+" || e.key === "=") {
-    zoom=Math.min(12,zoom*1.12); draw();
-  } else if (e.key === "-" || e.key === "_") {
-    zoom=Math.max(.2,zoom/1.12); draw();
-  } else if (e.key === "Enter" && e.ctrlKey) {
-    $("done").click();
-  }
-};
-window.onkeyup = e => keys.delete(e.key);
-
-async function start() {
-  try {
-    const s = await getJSON("/api/session");
-    sessionRevision = s.revision;
-    total = s.total;
-    await loadIndex(0);
-  } catch(e) {
-    showMessage("Не удалось открыть очередь");
-  }
-}
-start();
+boot();
 </script>
-</body>
 </html>
 """
+
+
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def __init__(self, address, app):
+        self.app = app
+        super().__init__(address, Handler)
 
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "AxisPuzzle/1"
 
     def log_message(self, fmt, *args):
-        # Не печатаем UID, пути, группы или другие сведения о снимках.
         pass
 
-    @property
-    def app(self):
-        return self.server.app
+    def valid_host(self):
+        host = self.headers.get("Host", "")
+        return host in {
+            f"127.0.0.1:{self.server.server_port}",
+            f"localhost:{self.server.server_port}",
+        }
 
-    def send_json(self, code, obj):
-        raw = json.dumps(obj, ensure_ascii=False).encode("utf-8")
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(raw)))
+    def authorized(self, png=False):
+        supplied = self.headers.get("X-Axis-Token", "")
+
+        if png:
+            from urllib.parse import parse_qs
+            supplied = parse_qs(
+                urlsplit(self.path).query
+            ).get("t", [""])[0]
+
+        return secrets.compare_digest(
+            supplied,
+            self.server.app.token,
+        )
+
+    def send_bytes(self, status, body, content_type):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
         self.end_headers()
-        self.wfile.write(raw)
 
-    def generic_error(self, code=HTTPStatus.BAD_REQUEST):
-        # Ошибки намеренно не содержат UID, путь, метку, угол или группу.
-        self.send_json(code, {"error": "request rejected"})
-
-    def read_json(self):
         try:
-            length = int(self.headers.get("Content-Length", "0"))
-            if length < 0 or length > 2_000_000:
-                raise ValueError
-            return json.loads(self.rfile.read(length))
-        except Exception:
-            raise ValueError
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def send_json(self, status, value):
+        self.send_bytes(
+            status,
+            json.dumps(
+                value,
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8"),
+            "application/json; charset=utf-8",
+        )
+
+    def fail(self, status, message):
+        self.send_json(status, {"error": message})
+
+    def route_index(self, route, prefix):
+        text = route[len(prefix):]
+        if not re.fullmatch(r"\d+", text):
+            raise ValueError("Некорректная позиция.")
+
+        index = int(text)
+        if not 0 <= index < len(self.server.app.order):
+            raise ValueError("Позиция вне очереди.")
+
+        return index
 
     def do_GET(self):
-        path = urlparse(self.path).path
-
-        if path == "/":
-            raw = HTML.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(raw)))
-            self.end_headers()
-            self.wfile.write(raw)
+        if not self.valid_host():
+            self.fail(403, "Недопустимый Host.")
             return
 
-        if path == "/api/session":
-            token = self.app.new_session()
-            self.send_json(200, {
-                "revision": token,
-                "total": len(self.app.uid_by_index),
-            })
-            return
+        route = urlsplit(self.path).path
+        app = self.server.app
 
-        if path.startswith("/api/state/"):
-            try:
-                index = int(path.rsplit("/", 1)[1])
-                self.send_json(200, {"item": self.app.get_item(index)})
-            except Exception:
-                self.generic_error(404)
-            return
+        try:
+            if route == "/":
+                page = HTML.replace(
+                    "__TOKEN__",
+                    json.dumps(app.token),
+                )
+                self.send_bytes(
+                    200,
+                    page.encode("utf-8"),
+                    "text/html; charset=utf-8",
+                )
+                return
 
-        if path.startswith("/api/image/"):
-            try:
-                index = int(path.rsplit("/", 1)[1])
-                raw = self.app.image_bytes(index)
-                self.send_response(200)
-                self.send_header("Content-Type", "image/png")
-                self.send_header("Cache-Control", "no-store")
-                self.send_header("Content-Length", str(len(raw)))
-                self.end_headers()
-                self.wfile.write(raw)
-            except Exception:
-                self.generic_error(404)
-            return
+            if not self.authorized(
+                png=route.startswith("/api/png/")
+            ):
+                self.fail(403, "Нет токена сессии.")
+                return
 
-        self.generic_error(404)
+            if route == "/api/session":
+                with app.lock:
+                    self.send_json(
+                        200,
+                        {
+                            "cursor": app.data["session"]["cursor"],
+                            "revision": app.data["session_revision"],
+                        },
+                    )
+                return
+
+            if route.startswith("/api/item/"):
+                index = self.route_index(route, "/api/item/")
+                self.send_json(200, app.view(index))
+                return
+
+            if route.startswith("/api/png/"):
+                index = self.route_index(route, "/api/png/")
+                uid = app.order[index]
+                self.send_bytes(200, app.pngs[uid], "image/png")
+                return
+
+            self.fail(404, "Не найдено.")
+
+        except ValueError as exc:
+            self.fail(400, str(exc))
+        except Exception:
+            self.fail(500, "Ошибка чтения сессии.")
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/save":
-            self.generic_error(404)
+        if not self.valid_host() or not self.authorized():
+            self.fail(403, "Нет доступа к сессии.")
+            return
+
+        if urlsplit(self.path).path != "/api/save":
+            self.fail(404, "Не найдено.")
             return
 
         try:
-            body = self.read_json()
-            index = int(body["index"])
-            revision = str(body["revision"])
-            seq = int(body["seq"])
-            item = body["item"]
+            if self.headers.get_content_type() != "application/json":
+                raise ValueError("Ожидается application/json.")
 
-            accepted = self.app.save_item(index, item, revision, seq)
-            self.send_json(200, {"saved": bool(accepted)})
-        except PermissionError:
-            self.generic_error(409)
-        except Exception:
-            self.generic_error(400)
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 300_000:
+                raise ValueError("Некорректный размер запроса.")
+
+            self.connection.settimeout(30)
+            body = self.rfile.read(length)
+
+            if len(body) != length:
+                raise ValueError("Запрос получен не полностью.")
+
+            def reject_constant(value):
+                raise ValueError(f"Недопустимое число: {value}")
+
+            raw = json.loads(
+                body.decode("utf-8"),
+                parse_constant=reject_constant,
+            )
+
+            self.send_json(200, self.server.app.save(raw))
+
+        except Conflict as exc:
+            self.fail(409, str(exc))
+        except (ValueError, UnicodeError) as exc:
+            self.fail(400, str(exc))
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as exc:
+            print(
+                f"Ошибка записи: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            self.fail(
+                500,
+                "Ошибка атомарной записи. Проверьте диск и права доступа.",
+            )
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--annotator", required=True)
-    parser.add_argument("--port", type=int, default=8769)
+    parser = argparse.ArgumentParser(
+        description="Разметка оси позвоночника на DXA-снимках."
+    )
+    parser.add_argument(
+        "--index",
+        default="data/index/images.csv",
+    )
+    parser.add_argument(
+        "--root",
+        default=".",
+    )
+    parser.add_argument(
+        "--annotator",
+    )
+    parser.add_argument(
+        "--out",
+        default="data/annotations",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8769,
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+    )
+
     args = parser.parse_args()
 
-    # Имя разметчика используется только для имени файла аннотаций.
-    # В HTML/API оно не передаётся.
-    app = App(args.annotator)
+    if not args.annotator or not re.fullmatch(
+        r"[A-Za-z0-9_-]+",
+        args.annotator,
+    ):
+        parser.error(
+            "--annotator: латинские буквы, цифры, _ и -."
+        )
 
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    server.app = app
+    if not 1 <= args.port <= 65535:
+        parser.error("--port: 1–65535.")
 
-    print(f"http://127.0.0.1:{args.port}/")
     try:
-        server.serve_forever()
+        app = Application(args)
+        server = Server(("127.0.0.1", args.port), app)
+    except (
+        OSError,
+        ValueError,
+        ImportError,
+        csv.Error,
+    ) as exc:
+        parser.exit(1, f"Ошибка запуска: {exc}\n")
+
+    url = f"http://127.0.0.1:{args.port}"
+    print(f"\n{url}\nОстановка: Ctrl+C.", flush=True)
+    print(
+        "Используйте одну вкладку на файл разметки.",
+        flush=True,
+    )
+
+    if not args.no_browser:
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass
+
+    try:
+        server.serve_forever(poll_interval=0.3)
     except KeyboardInterrupt:
-        pass
+        print("\nСервер остановлен.", flush=True)
     finally:
         server.server_close()
 
