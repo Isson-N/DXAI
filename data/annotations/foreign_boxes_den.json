@@ -1,0 +1,1641 @@
+{
+  "schema": "dxa-foreign-boxes/1",
+  "annotator": "den",
+  "updated": "2026-09-21T17:55:17.590275+00:00",
+  "images": {
+    "1.2.643.5.1.13.13.12.2.77.8252.02031401091510001200041308031003": {
+      "state": "done",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 6,
+          "y1": 44,
+          "x2": 110,
+          "y2": 4,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 206,
+          "y1": 3,
+          "x2": 296,
+          "y2": 27,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 144.966,
+      "updated": "2026-09-21T17:50:20.357106+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.13110108131113110013070512051310": {
+      "state": "done",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 20,
+          "y1": 26,
+          "x2": 85,
+          "y2": 3,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 226,
+          "y1": 3,
+          "x2": 281,
+          "y2": 3,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 56.406,
+      "updated": "2026-09-21T17:50:20.357126+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.04000404020304020301120408100801": {
+      "state": "done",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 20,
+          "y1": 107,
+          "x2": 104,
+          "y2": 6,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 289,
+          "y1": 91,
+          "x2": 203,
+          "y2": 70,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 138,
+          "y1": 6,
+          "x2": 197,
+          "y2": 67,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 37.871,
+      "updated": "2026-09-21T17:50:20.357143+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.13030903151515081500090603041412": {
+      "state": "done",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "rect",
+          "x": 216,
+          "y": 0,
+          "w": 27,
+          "h": 20,
+          "kind": "object",
+          "class": "застёжка/пряжка",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 16.108,
+      "updated": "2026-09-21T17:50:20.357153+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.04050904100201141507070306131511": {
+      "state": "done",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 3,
+          "y1": 21,
+          "x2": 69,
+          "y2": 3,
+          "thickness": 6,
+          "kind": "object",
+          "class": "застёжка/пряжка",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 206,
+          "y1": 3,
+          "x2": 255,
+          "y2": 11,
+          "thickness": 6,
+          "kind": "object",
+          "class": "застёжка/пряжка",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 13.146,
+      "updated": "2026-09-21T17:50:20.357164+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.07090609050707040704081509101500": {
+      "state": "done",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 9,
+          "y1": 40,
+          "x2": 79,
+          "y2": 4,
+          "thickness": 6,
+          "kind": "object",
+          "class": "застёжка/пряжка",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 174,
+          "y1": 3,
+          "x2": 270,
+          "y2": 28,
+          "thickness": 6,
+          "kind": "object",
+          "class": "застёжка/пряжка",
+          "sure": true
+        },
+        {
+          "shape": "rect",
+          "x": 109,
+          "y": 0,
+          "w": 22,
+          "h": 16,
+          "kind": "object",
+          "class": "застёжка/пряжка",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 23.023,
+      "updated": "2026-09-21T17:50:20.357180+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.01120709131111081211081313110800": {
+      "state": "done",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 12,
+          "y1": 13,
+          "x2": 51,
+          "y2": 19,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 58,
+          "y1": 19,
+          "x2": 112,
+          "y2": 4,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 228,
+          "y1": 3,
+          "x2": 273,
+          "y2": 13,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "rect",
+          "x": 181,
+          "y": 0,
+          "w": 23,
+          "h": 49,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "rect",
+          "x": 121,
+          "y": 57,
+          "w": 42,
+          "h": 46,
+          "kind": "object",
+          "class": "застёжка/пряжка",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 89.405,
+      "updated": "2026-09-21T17:50:20.357199+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.10011315050807060809100706050011": {
+      "state": "done",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "rect",
+          "x": 68,
+          "y": 38,
+          "w": 22,
+          "h": 20,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 21,
+          "y1": 21,
+          "x2": 81,
+          "y2": 3,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 251,
+          "y1": 3,
+          "x2": 284,
+          "y2": 13,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 15.481,
+      "updated": "2026-09-21T17:50:20.357214+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.08131412000401011215150704040610": {
+      "state": "done",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "rect",
+          "x": 20,
+          "y": 37,
+          "w": 50,
+          "h": 44,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 18.821,
+      "updated": "2026-09-21T17:50:20.357223+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.05130006080703150808130311150104": {
+      "state": "done",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 12,
+          "y1": 46,
+          "x2": 54,
+          "y2": 45,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 125,
+          "y1": 4,
+          "x2": 64,
+          "y2": 44,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 197,
+          "y1": 3,
+          "x2": 273,
+          "y2": 37,
+          "thickness": 6,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 13.789,
+      "updated": "2026-09-21T17:50:20.357235+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.14031513011512070711151413071213": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 23.605,
+      "updated": "2026-09-21T17:50:20.357241+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.02060605151213121009151302130207": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 20.57,
+      "updated": "2026-09-21T17:50:20.357246+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.15090515141309140806011408041204": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "rect",
+          "x": 27,
+          "y": 68,
+          "w": 43,
+          "h": 41,
+          "kind": "object",
+          "class": "другое",
+          "sure": false
+        }
+      ],
+      "comment": "",
+      "seconds": 38.289,
+      "updated": "2026-09-21T17:50:20.357252+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.02030504060005060505040905021305": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 6.752,
+      "updated": "2026-09-21T17:50:20.357256+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.01120104060301100213100004141203": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 5.591,
+      "updated": "2026-09-21T17:50:20.357260+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.10030113050111051002020402141304": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "rect",
+          "x": 290,
+          "y": 0,
+          "w": 10,
+          "h": 8,
+          "kind": "object",
+          "class": "другое",
+          "sure": false
+        }
+      ],
+      "comment": "",
+      "seconds": 14.913,
+      "updated": "2026-09-21T17:50:20.357266+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.13140203110104081414101201001405": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 5.266,
+      "updated": "2026-09-21T17:50:20.357270+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.04071014120313000711051010091409": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "rect",
+          "x": 45,
+          "y": 135,
+          "w": 68,
+          "h": 91,
+          "kind": "hard_negative",
+          "class": "артефакт",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 123,
+          "y1": 72,
+          "x2": 21,
+          "y2": 155,
+          "thickness": 3,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 110,
+          "y1": 64,
+          "x2": 20,
+          "y2": 142,
+          "thickness": 3,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 113,
+          "y1": 40,
+          "x2": 28,
+          "y2": 91,
+          "thickness": 3,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 105,
+          "y1": 27,
+          "x2": 16,
+          "y2": 75,
+          "thickness": 3,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 216,
+          "y1": 51,
+          "x2": 298,
+          "y2": 97,
+          "thickness": 3,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 225,
+          "y1": 39,
+          "x2": 298,
+          "y2": 81,
+          "thickness": 3,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 207,
+          "y1": 80,
+          "x2": 290,
+          "y2": 164,
+          "thickness": 3,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 216,
+          "y1": 72,
+          "x2": 295,
+          "y2": 151,
+          "thickness": 3,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 68.623,
+      "updated": "2026-09-21T17:52:11.314395+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.05111111030105140803060510040613": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 7.512,
+      "updated": "2026-09-21T17:52:14.134218+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.12021011000615031102060001101203": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 7.619,
+      "updated": "2026-09-21T17:52:14.516473+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.05060902130204131205041207051405": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 5.006,
+      "updated": "2026-09-21T17:52:14.750686+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.14031015091008031013040205110915": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 4.756,
+      "updated": "2026-09-21T17:52:15.364924+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.09050515110402090102050206010406": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 10.065,
+      "updated": "2026-09-21T17:52:15.943115+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.05100110120015150515030506140402": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 7.92,
+      "updated": "2026-09-21T17:52:16.344814+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.14030405080503070005090010011210": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 9.65,
+      "updated": "2026-09-21T17:52:17.967052+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.13090607110001000310151006050113": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 295,
+          "y1": 3,
+          "x2": 29,
+          "y2": 3,
+          "thickness": 6,
+          "kind": "hard_negative",
+          "class": "яркая линия у края кадра",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 27.586,
+      "updated": "2026-09-21T17:52:18.653146+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.12071112070710000412111310090807": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 4.488,
+      "updated": "2026-09-21T17:52:19.054411+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.14131410040814100713070401091213": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 5.585,
+      "updated": "2026-09-21T17:52:19.252469+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.05150512091506110304120408070606": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 6.194,
+      "updated": "2026-09-21T17:52:19.447074+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.03150209000513130305020013101408": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 8.705,
+      "updated": "2026-09-21T17:52:19.636722+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.09071502150602001009041214040315": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 97,
+          "y1": 40,
+          "x2": 20,
+          "y2": 145,
+          "thickness": 6,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 96,
+          "y1": 29,
+          "x2": 7,
+          "y2": 134,
+          "thickness": 6,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 62,
+          "y1": 4,
+          "x2": 5,
+          "y2": 71,
+          "thickness": 6,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 50,
+          "y1": 3,
+          "x2": 3,
+          "y2": 50,
+          "thickness": 6,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 176,
+          "y1": 33,
+          "x2": 237,
+          "y2": 113,
+          "thickness": 6,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 178,
+          "y1": 24,
+          "x2": 250,
+          "y2": 108,
+          "thickness": 6,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 203,
+          "y1": 3,
+          "x2": 265,
+          "y2": 62,
+          "thickness": 6,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 225,
+          "y1": 3,
+          "x2": 266,
+          "y2": 36,
+          "thickness": 6,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 30.787,
+      "updated": "2026-09-21T17:52:19.973339+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.10051211011505050506141504040101": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 6.284,
+      "updated": "2026-09-21T17:52:20.189521+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.04091012040015061107090014081504": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 7.576,
+      "updated": "2026-09-21T17:52:20.408306+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.12071204070300150506091512141413": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 8.612,
+      "updated": "2026-09-21T17:52:20.599381+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.12060607091105150404131215110908": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 10.283,
+      "updated": "2026-09-21T17:52:20.776622+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.11081308031311040302130506061304": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 85,
+          "y1": 12,
+          "x2": 2,
+          "y2": 142,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 73,
+          "y1": 4,
+          "x2": 2,
+          "y2": 101,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 157,
+          "y1": 12,
+          "x2": 194,
+          "y2": 40,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 220,
+          "y1": 75,
+          "x2": 193,
+          "y2": 44,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 227,
+          "y1": 63,
+          "x2": 173,
+          "y2": 9,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 23.551,
+      "updated": "2026-09-21T17:52:20.926964+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.02120204101515130306021007150210": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 84,
+          "y1": 2,
+          "x2": 19,
+          "y2": 79,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 104,
+          "y1": 8,
+          "x2": 25,
+          "y2": 96,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 195,
+          "y1": 5,
+          "x2": 281,
+          "y2": 83,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 224,
+          "y1": 3,
+          "x2": 290,
+          "y2": 65,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 17.838,
+      "updated": "2026-09-21T17:52:21.223972+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.07150604010711031305090702140107": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 102,
+          "y1": 49,
+          "x2": 40,
+          "y2": 116,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 100,
+          "y1": 36,
+          "x2": 39,
+          "y2": 100,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 89,
+          "y1": 2,
+          "x2": 13,
+          "y2": 107,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 78,
+          "y1": 2,
+          "x2": 7,
+          "y2": 91,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 167,
+          "y1": 43,
+          "x2": 243,
+          "y2": 103,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 166,
+          "y1": 28,
+          "x2": 249,
+          "y2": 91,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 184,
+          "y1": 2,
+          "x2": 257,
+          "y2": 58,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 201,
+          "y1": 2,
+          "x2": 259,
+          "y2": 45,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 26.002,
+      "updated": "2026-09-21T17:52:21.410735+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.14070208080209001506081402060503": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 5.295,
+      "updated": "2026-09-21T17:52:21.791692+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.05001409080504151204111500000514": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 3.565,
+      "updated": "2026-09-21T17:52:21.962401+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.02030112081401101404040904010405": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 3.252,
+      "updated": "2026-09-21T17:52:22.163614+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.14060403060314010506081209070311": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 70,
+          "y1": 2,
+          "x2": 3,
+          "y2": 54,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 90,
+          "y1": 2,
+          "x2": 2,
+          "y2": 78,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 204,
+          "y1": 3,
+          "x2": 282,
+          "y2": 76,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 225,
+          "y1": 2,
+          "x2": 286,
+          "y2": 57,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "rect",
+          "x": 191,
+          "y": 59,
+          "w": 88,
+          "h": 187,
+          "kind": "hard_negative",
+          "class": "артефакт",
+          "sure": true
+        },
+        {
+          "shape": "rect",
+          "x": 11,
+          "y": 85,
+          "w": 92,
+          "h": 128,
+          "kind": "hard_negative",
+          "class": "артефакт",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 26.293,
+      "updated": "2026-09-21T17:52:22.335644+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.02030508140000071310150302011113": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 104,
+          "y1": 21,
+          "x2": 4,
+          "y2": 92,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 102,
+          "y1": 39,
+          "x2": 23,
+          "y2": 100,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 193,
+          "y1": 46,
+          "x2": 278,
+          "y2": 88,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 199,
+          "y1": 28,
+          "x2": 275,
+          "y2": 71,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 235,
+          "y1": 2,
+          "x2": 287,
+          "y2": 50,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 254,
+          "y1": 2,
+          "x2": 287,
+          "y2": 32,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 80,
+          "y1": 2,
+          "x2": 13,
+          "y2": 49,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 59,
+          "y1": 2,
+          "x2": 12,
+          "y2": 30,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 22.015,
+      "updated": "2026-09-21T17:52:22.494007+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.10151201011509101414030411060512": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "rect",
+          "x": 267,
+          "y": 41,
+          "w": 27,
+          "h": 29,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "rect",
+          "x": 16,
+          "y": 43,
+          "w": 30,
+          "h": 36,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 22.744,
+      "updated": "2026-09-21T17:52:22.661282+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.03020907090204060013031106111312": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 5.123,
+      "updated": "2026-09-21T17:52:22.847309+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.15000310101315070007100105150401": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 78,
+          "y1": 14,
+          "x2": 5,
+          "y2": 114,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 68,
+          "y1": 9,
+          "x2": 2,
+          "y2": 97,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 16.688,
+      "updated": "2026-09-21T17:52:23.045500+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.14080500031007021314121106040303": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "rect",
+          "x": 188,
+          "y": 85,
+          "w": 85,
+          "h": 84,
+          "kind": "hard_negative",
+          "class": "артефакт",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 84,
+          "y1": 18,
+          "x2": 2,
+          "y2": 90,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 75,
+          "y1": 7,
+          "x2": 2,
+          "y2": 75,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 18.779,
+      "updated": "2026-09-21T17:52:23.225938+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.12111312010203070900101115051015": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 87,
+          "y1": 15,
+          "x2": 7,
+          "y2": 134,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 97,
+          "y1": 31,
+          "x2": 27,
+          "y2": 136,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 58,
+          "y1": 2,
+          "x2": 5,
+          "y2": 74,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 42,
+          "y1": 2,
+          "x2": 2,
+          "y2": 43,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 183,
+          "y1": 32,
+          "x2": 268,
+          "y2": 99,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 192,
+          "y1": 19,
+          "x2": 259,
+          "y2": 69,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 18.419,
+      "updated": "2026-09-21T17:52:26.368823+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.05140704131104071313121101000313": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 4.852,
+      "updated": "2026-09-21T17:52:27.055252+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.02050314081501100100131400110412": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 9,
+          "y1": 20,
+          "x2": 60,
+          "y2": 2,
+          "thickness": 4,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 189,
+          "y1": 2,
+          "x2": 220,
+          "y2": 7,
+          "thickness": 4,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 223,
+          "y1": 7,
+          "x2": 277,
+          "y2": 6,
+          "thickness": 4,
+          "kind": "object",
+          "class": "другое",
+          "sure": true
+        },
+        {
+          "shape": "rect",
+          "x": 182,
+          "y": 9,
+          "w": 19,
+          "h": 22,
+          "kind": "object",
+          "class": "застёжка/пряжка",
+          "sure": true
+        },
+        {
+          "shape": "rect",
+          "x": 159,
+          "y": 12,
+          "w": 18,
+          "h": 20,
+          "kind": "object",
+          "class": "застёжка/пряжка",
+          "sure": true
+        },
+        {
+          "shape": "rect",
+          "x": 122,
+          "y": 10,
+          "w": 30,
+          "h": 40,
+          "kind": "object",
+          "class": "застёжка/пряжка",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 37.425,
+      "updated": "2026-09-21T17:52:27.609521+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.07020101080211090714060800071015": {
+      "state": "done",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 145,
+          "y1": 52,
+          "x2": 43,
+          "y2": 111,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 143,
+          "y1": 34,
+          "x2": 43,
+          "y2": 92,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 146,
+          "y1": 8,
+          "x2": 44,
+          "y2": 68,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 127,
+          "y1": 4,
+          "x2": 52,
+          "y2": 38,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 145,
+          "y1": 67,
+          "x2": 104,
+          "y2": 111,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 149,
+          "y1": 81,
+          "x2": 115,
+          "y2": 120,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 225,
+          "y1": 93,
+          "x2": 284,
+          "y2": 182,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 231,
+          "y1": 82,
+          "x2": 290,
+          "y2": 160,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 232,
+          "y1": 52,
+          "x2": 295,
+          "y2": 115,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 239,
+          "y1": 41,
+          "x2": 297,
+          "y2": 96,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 241,
+          "y1": 12,
+          "x2": 296,
+          "y2": 63,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 249,
+          "y1": 3,
+          "x2": 297,
+          "y2": 44,
+          "thickness": 4,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 27.863,
+      "updated": "2026-09-21T17:52:27.979488+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.00080112010710030607090609070409": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 3.923,
+      "updated": "2026-09-21T17:52:28.361388+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.00121200081108110912041503010000": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 4.568,
+      "updated": "2026-09-21T17:52:28.715257+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.00071307071102020311080215100104": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 5.202,
+      "updated": "2026-09-21T17:52:28.966984+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.07111115111305011108141412010801": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 5.084,
+      "updated": "2026-09-21T17:52:29.170061+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.03120113151010021310000801051000": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 679.211,
+      "updated": "2026-09-21T17:55:17.590270+00:00"
+    }
+  }
+}

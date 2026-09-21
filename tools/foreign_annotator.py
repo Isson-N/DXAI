@@ -531,6 +531,11 @@ class Application:
                 "Пропущенный снимок не должен содержать рамки."
             )
 
+        # A saved box is an explicit annotation. Keep truly untouched images as
+        # drafts, but do not require a separate "done" action after drawing.
+        if state == "draft" and cleaned_boxes:
+            state = "done"
+
         result.update(
             state=state,
             y_foreign=y_foreign,
