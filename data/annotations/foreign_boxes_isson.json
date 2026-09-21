@@ -1,6 +1,15 @@
 {
- "schema": "dxa-foreign-boxes/1",
- "annotator": "isson",
- "updated": "2026-09-21T15:07:06.168660+00:00",
- "images": {}
+  "schema": "dxa-foreign-boxes/1",
+  "annotator": "isson",
+  "updated": "2026-09-21T15:40:28.251989+00:00",
+  "images": {
+    "1.2.643.5.1.13.13.12.2.77.8252.06061007030610120805010913100711": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 143.34,
+      "updated": "2026-09-21T15:40:28.251952+00:00"
+    }
+  }
 }
