@@ -815,6 +815,14 @@ function mode(){
  if(ann.state==="skipped")return "skipped";
  return names.every(k=>ann.points[k])?"done":"draft";
 }
+function autoQueue(){
+ // Автосохранение сохраняет ЧЕРНОВИК: раньше оно писало «готово» сразу после
+ // шестой точки, и снимок считался завершённым до того, как человек его
+ // проверил и нажал N (находка astra, 21.09.2026). Уже завершённые записи
+ // статус сохраняют.
+ const keep=(ann&&(ann.state==="done"||ann.state==="skipped"))?ann.state:"draft";
+ return queueSave(index,keep)
+}
 function saveStatus(){
  $("save").textContent=failed?"НЕ СОХРАНЕНО":pending?"Сохранение…":
   dirty?"Изменения в памяти":"Сохранено ✓";
@@ -851,7 +859,7 @@ function queueSave(cursor=index, requestedMode=null){
 function mutate(fn){
  if(!active())return;
  account();fn();delete ann.state;dirty=true;
- render();queueSave();
+ render();autoQueue();
 }
 function choose(i){
  selected=i;
@@ -1078,7 +1086,7 @@ document.querySelectorAll("[data-state]").forEach(b=>
 $("comment").oninput=()=>mutate(()=>{ann.comment=$("comment").value});
 $("retry").onclick=async()=>{
  if(conflict||pending||!ann)return;
- failed=false;error();await queueSave();render()
+ failed=false;error();await autoQueue();render()
 };
 document.onkeydown=e=>{
  if(e.target.matches("input,textarea,select")||e.ctrlKey||e.altKey||e.metaKey)return;
@@ -1101,13 +1109,13 @@ document.onkeydown=e=>{
 document.onkeyup=e=>{if(e.code==="Space")space=false};
 window.addEventListener("blur",()=>{
  account();space=false;gesture=null;
- if(ann&&!busy&&!failed)queueSave()
+ if(ann&&!busy&&!failed)autoQueue()
 });
 window.addEventListener("focus",()=>{last=performance.now()});
 document.addEventListener("visibilitychange",()=>{
  // Периодический учёт ограничивает возможную потерю времени до секунды.
  last=performance.now();
- if(document.hidden&&ann&&!busy&&!failed)queueSave()
+ if(document.hidden&&ann&&!busy&&!failed)autoQueue()
 });
 window.addEventListener("beforeunload",e=>{
  if(pending||dirty||failed){e.preventDefault();e.returnValue=""}
@@ -1117,7 +1125,7 @@ setInterval(()=>{
  account();renderHeader();
  if(!pending&&!failed)saveStatus();
 },1000);
-setInterval(()=>{if(active())queueSave()},10000);
+setInterval(()=>{if(active())autoQueue()},10000);
 async function boot(){
  try{
   const s=await api("/api/session");revision=s.revision;

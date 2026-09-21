@@ -318,12 +318,22 @@ class Application:
             self.data["schema"] = SCHEMA
             self.data["annotator"] = args.annotator
 
-            for uid in list(self.data["images"]):
-                if uid not in self.items:
-                    del self.data["images"][uid]
+            # Записи вне текущей выборки НЕ удаляются: иначе запуск с другим
+            # --part или изменённым индексом молча стирал чужую работу при
+            # первом же сохранении (находка astra, 21.09.2026). Они просто
+            # хранятся нетронутыми и не показываются в очереди.
+            self.foreign_records = {
+                uid: annotation
+                for uid, annotation in self.data["images"].items()
+                if uid not in self.items
+            }
+            if self.foreign_records:
+                print(f"В файле есть {len(self.foreign_records)} записей вне текущей "
+                      f"выборки — они сохранены нетронутыми.", flush=True)
 
             for uid, annotation in list(self.data["images"].items()):
-                self.data["images"][uid] = self.validate(uid, annotation)
+                if uid in self.items:
+                    self.data["images"][uid] = self.validate(uid, annotation)
 
         self.filename.parent.mkdir(parents=True, exist_ok=True)
         print(f"Изображений для разметки: {len(self.order)}", flush=True)
@@ -331,7 +341,10 @@ class Application:
     def blank(self, uid):
         item = self.items[uid]
         return {
-            "state": "done",
+            # Черновик, а не «готово»: автосохранение раз в 15 секунд иначе
+            # помечало размеченными снимки, которые человек только открыл
+            # (находка astra при аудите 21.09.2026).
+            "state": "draft",
             "y_foreign": item["y_foreign"],
             "boxes": [],
             "comment": "",
@@ -348,8 +361,8 @@ class Application:
         item = self.items[uid]
         result = self.blank(uid)
 
-        state = raw.get("state", "done")
-        if state not in ("done", "skipped", "empty_confirmed"):
+        state = raw.get("state", "draft")
+        if state not in ("draft", "done", "skipped", "empty_confirmed"):
             raise ValueError("Недопустимое состояние снимка.")
 
         y_foreign = raw.get("y_foreign", item["y_foreign"])
@@ -526,6 +539,10 @@ class Application:
             seconds=round(float(seconds), 3),
             updated=now_iso(),
         )
+        # Снимок нельзя закрыть как «готово» без единого элемента разметки:
+        # отсутствие предметов подтверждается отдельным состоянием empty_confirmed.
+        if result["state"] == "done" and not result["boxes"]:
+            result["state"] = "draft"
         return result
 
     def state(self):
@@ -537,7 +554,9 @@ class Application:
                 images.append(
                     {
                         **item,
-                        "annotated": annotation is not None,
+                        "annotated": annotation is not None
+                        and annotation.get("state")
+                        in ("done", "skipped", "empty_confirmed"),
                         "state": annotation.get("state")
                         if annotation
                         else None,
