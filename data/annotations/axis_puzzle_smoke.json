@@ -1,0 +1,98 @@
+{
+  "schema": "dxa-axis-puzzle/1",
+  "session_revision": "BqEIHtFkSVtxWQGo50HjYsPHuSjIIApc",
+  "items": {
+    "1.2.643.5.1.13.13.12.2.77.8252.10001500010311100907131007040004": {
+      "points": {
+        "Th12": {
+          "top": {
+            "x": 0.5,
+            "y": 0.3,
+            "state": "visible",
+            "confidence": 3
+          },
+          "bottom": {
+            "x": 0.5,
+            "y": 0.35,
+            "state": "visible",
+            "confidence": 3
+          }
+        },
+        "L1": {
+          "top": {
+            "x": null,
+            "y": null,
+            "state": "not_visible",
+            "confidence": 1
+          },
+          "bottom": {
+            "x": null,
+            "y": null,
+            "state": "not_visible",
+            "confidence": 1
+          }
+        },
+        "L2": {
+          "top": {
+            "x": null,
+            "y": null,
+            "state": "not_visible",
+            "confidence": 1
+          },
+          "bottom": {
+            "x": null,
+            "y": null,
+            "state": "not_visible",
+            "confidence": 1
+          }
+        },
+        "L3": {
+          "top": {
+            "x": null,
+            "y": null,
+            "state": "not_visible",
+            "confidence": 1
+          },
+          "bottom": {
+            "x": null,
+            "y": null,
+            "state": "not_visible",
+            "confidence": 1
+          }
+        },
+        "L4": {
+          "top": {
+            "x": null,
+            "y": null,
+            "state": "not_visible",
+            "confidence": 1
+          },
+          "bottom": {
+            "x": null,
+            "y": null,
+            "state": "not_visible",
+            "confidence": 1
+          }
+        },
+        "L5": {
+          "top": {
+            "x": null,
+            "y": null,
+            "state": "not_visible",
+            "confidence": 1
+          },
+          "bottom": {
+            "x": null,
+            "y": null,
+            "state": "not_visible",
+            "confidence": 1
+          }
+        }
+      },
+      "comment": "дымовой тест",
+      "verdict": "deviated",
+      "features": [],
+      "status": "done"
+    }
+  }
+}
