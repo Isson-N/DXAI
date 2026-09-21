@@ -774,18 +774,23 @@ function status(){
 function enqueue(){
  if(!active())return;
  account();
+ // Снимок и его идентификатор захватываются ВМЕСТЕ: запрос уходит из очереди
+ // позже, и к тому моменту current может указывать уже на следующий снимок —
+ // тогда разметка одного кадра улетала другому («empty_confirmed не может
+ // содержать рамки» сразу после автоперехода по Enter).
  let snapshot=copy(ann);
+ let target=current;
  pending++;status();
  saveQueue=saveQueue.then(()=>api(
-  "/api/annotation/"+encodeURIComponent(current.image_id),{
+  "/api/annotation/"+encodeURIComponent(target.image_id),{
    method:"PUT",headers:{"Content-Type":"application/json"},
    body:JSON.stringify(snapshot)
   }).then(saved=>{
    // Ответ НЕ подменяет ann: пока запрос летел, человек мог удалить рамку или
    // поменять толщину, и старый ответ возвращал удалённое обратно (аудит 1.2).
    // Экран остаётся авторитетным, от сервера берём только факт сохранения.
-   saveOK=true;current.annotated=true;showError("");
-   if(saved&&saved.state)current.state=saved.state;
+   saveOK=true;target.annotated=true;showError("");
+   if(saved&&saved.state)target.state=saved.state;
   }).catch(e=>{
    saveOK=false;showError(e.message+
     " Изменения остаются в браузере. Нажмите «Повторить сохранение».")
