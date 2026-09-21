@@ -29,7 +29,10 @@ class ConvBlock(nn.Module):
 
 
 class KeypointNet(nn.Module):
-    def __init__(self, pretrained=True):
+    # Значения по умолчанию описывают поясничную модель (восемь точек и три
+    # головы состояний кадра). Бедро передаёт свои: шесть точек и по одной
+    # голове состояния на точку.
+    def __init__(self, pretrained=True, n_points=8, state_sizes=(3, 3, 3)):
         super().__init__()
         try:
             self.encoder = timm.create_model(
@@ -45,12 +48,13 @@ class KeypointNet(nn.Module):
         self.d3 = ConvBlock(256 + ch[2], 128)
         self.d2 = ConvBlock(128 + ch[1], 64)
         self.d1 = ConvBlock(64 + ch[0], 32)
-        self.out = nn.Conv2d(32, 8, 1)
-        self.presence = nn.Linear(ch[4], 8)
-        self.regress = nn.Linear(ch[4], 16)  # контрольный вариант: координаты без пространственного выхода
-        self.cls_left = nn.Linear(ch[4], 3)
-        self.cls_right = nn.Linear(ch[4], 3)
-        self.cls_th12 = nn.Linear(ch[4], 3)
+        self.n_points = int(n_points)
+        self.out = nn.Conv2d(32, self.n_points, 1)
+        self.presence = nn.Linear(ch[4], self.n_points)
+        # контрольный вариант: координаты без пространственного выхода
+        self.regress = nn.Linear(ch[4], self.n_points * 2)
+        self.state_heads = nn.ModuleList(
+            [nn.Linear(ch[4], int(size)) for size in state_sizes])
 
     def forward(self, x):
         fs = self.encoder(x)
@@ -65,8 +69,9 @@ class KeypointNet(nn.Module):
         z = self.d1(torch.cat([z, fs[-5]], 1))
         hm = self.out(z)
         pooled = F.adaptive_avg_pool2d(fs[-1], 1).flatten(1)
-        return (hm, self.presence(pooled), self.regress(pooled).reshape(-1, 8, 2).sigmoid(),
-                torch.stack([self.cls_left(pooled), self.cls_right(pooled), self.cls_th12(pooled)], 1))
+        return (hm, self.presence(pooled),
+                self.regress(pooled).reshape(-1, self.n_points, 2).sigmoid(),
+                torch.stack([head(pooled) for head in self.state_heads], 1))
 
 
 class MultiHeadCNN(nn.Module):

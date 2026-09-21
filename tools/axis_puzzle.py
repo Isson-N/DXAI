@@ -958,11 +958,6 @@ function setState(state){
  if(!ann||busy||failed)return;
 
  const point=pointValue();
- if(state==="visible"&&!Number.isFinite(point.x)){
-  error("Для visible поставьте координату щелчком по изображению.");
-  render();
-  return;
- }
 
  mutate(()=>{
   const result={
@@ -1194,11 +1189,10 @@ function put(point){
  const state=currentPoint.state;
  const confidence=Number($("confidence").value)||1;
 
- if(state==="not_visible"||state==="out_of_frame"){
-  error("Для постановки координаты выберите V или ?.");
-  return;
- }
-
+ // Раньше здесь стоял отказ: координату нельзя поставить, пока состояние
+ // not_visible, а состояние «видна» нельзя выбрать без координаты — круг
+ // замыкался, и ни одну точку нельзя было разметить. Теперь щелчок сам
+ // переводит точку в «видна», сохраняя «не уверена», если она выбрана.
  error();
 
  mutate(()=>{

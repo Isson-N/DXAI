@@ -65,9 +65,27 @@ class SpineKeypointModel:
         self.device = device
         self.net = self._build(payload["state_dict"], device)
 
+    # Головы состояний раньше назывались cls_left/cls_right/cls_th12, а теперь
+    # это ModuleList: сеть стала параметрической, чтобы её можно было собрать
+    # и под шесть точек бедра. Уже обученные веса лежат со старыми именами,
+    # поэтому переименовываем их при загрузке, иначе модель не соберётся.
+    LEGACY_HEADS = {"cls_left": "state_heads.0",
+                    "cls_right": "state_heads.1",
+                    "cls_th12": "state_heads.2"}
+
+    @classmethod
+    def _migrate_keys(cls, state_dict):
+        migrated = {}
+        for key, value in state_dict.items():
+            head, _, tail = key.partition(".")
+            migrated[f"{cls.LEGACY_HEADS[head]}.{tail}" if head in cls.LEGACY_HEADS
+                     else key] = value
+        return migrated
+
     def _build(self, state_dict, device):
         from .nets import KeypointNet
 
+        state_dict = self._migrate_keys(state_dict)
         net = KeypointNet(pretrained=False)
         # strict=False: контрольная голова прямой регрессии координат в инференсе не участвует,
         # и веса, обученные до её появления, должны грузиться без ошибок.
