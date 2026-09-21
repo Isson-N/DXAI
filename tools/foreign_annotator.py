@@ -752,11 +752,20 @@ function copy(x){return JSON.parse(JSON.stringify(x))}
 function shapeOf(q){return q.shape==="line"?"line":"rect"}
 function lineLength(q){return Math.hypot(q.x2-q.x1,q.y2-q.y1)}
 function api(url,opt={}){
- return fetch(url,{cache:"no-store",...opt}).then(async r=>{
+ // Таймаут обязателен: очередь сохранения последовательная, и один повисший
+ // запрос (потеря сети, прокси, смена IPv4/IPv6) блокировал её навсегда —
+ // интерфейс замирал на «Сохранение…», хотя сервер был жив.
+ let stop=new AbortController();
+ let timer=setTimeout(()=>stop.abort(),15000);
+ return fetch(url,{cache:"no-store",signal:stop.signal,...opt}).then(async r=>{
   if(!r.ok){let j={};try{j=await r.json()}catch(e){}
    throw Error(j.error||("Ошибка сервера: "+r.status))}
   return r.json()
- })
+ }).catch(e=>{
+  throw Error(e.name==="AbortError"
+   ? "Сервер не ответил за 15 секунд. Проверьте, что он запущен, и нажмите «Повторить сохранение»."
+   : e.message)
+ }).finally(()=>clearTimeout(timer))
 }
 function showError(text=""){$("error").textContent=text;$("error").hidden=!text}
 function active(){return !!ann&&!!current}

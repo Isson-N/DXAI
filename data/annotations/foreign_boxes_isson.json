@@ -1,0 +1,190 @@
+{
+  "schema": "dxa-foreign-boxes/1",
+  "annotator": "isson",
+  "updated": "2026-09-21T17:14:14.430894+00:00",
+  "images": {
+    "1.2.643.5.1.13.13.12.2.77.8252.06061007030610120805010913100711": {
+      "state": "empty_confirmed",
+      "y_foreign": 0,
+      "boxes": [],
+      "comment": "",
+      "seconds": 777.346,
+      "updated": "2026-09-21T17:13:21.078844+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.14110604050810020100071004090404": {
+      "state": "draft",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 160,
+          "y1": 18,
+          "x2": 239,
+          "y2": 87,
+          "thickness": 12,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 73,
+          "y1": 27,
+          "x2": 11,
+          "y2": 100,
+          "thickness": 12,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "rect",
+          "x": 0,
+          "y": 0,
+          "w": 50,
+          "h": 64,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "Отметил две ловушки - ребра. И прямоугольник",
+      "seconds": 134.672,
+      "updated": "2026-09-21T17:13:23.213903+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.06030210110500061108030910090908": {
+      "state": "draft",
+      "y_foreign": 1,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 294,
+          "y1": 23,
+          "x2": 245,
+          "y2": 24,
+          "thickness": 7,
+          "kind": "object",
+          "class": "провод/трубка",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 187,
+          "y1": 4,
+          "x2": 240,
+          "y2": 23,
+          "thickness": 7,
+          "kind": "object",
+          "class": "провод/трубка",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 96,
+          "y1": 3,
+          "x2": 44,
+          "y2": 20,
+          "thickness": 6,
+          "kind": "object",
+          "class": "провод/трубка",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 3,
+          "y1": 21,
+          "x2": 51,
+          "y2": 19,
+          "thickness": 6,
+          "kind": "object",
+          "class": "провод/трубка",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 96.175,
+      "updated": "2026-09-21T17:13:25.270165+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.03121103130007121510030803050514": {
+      "state": "draft",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 202,
+          "y1": 37,
+          "x2": 271,
+          "y2": 68,
+          "thickness": 14,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 115,
+          "y1": 31,
+          "x2": 36,
+          "y2": 75,
+          "thickness": 14,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "Два ребра - ловушки",
+      "seconds": 379.164,
+      "updated": "2026-09-21T17:13:27.613844+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.03010603150012061509030005111300": {
+      "state": "draft",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "rect",
+          "x": 1,
+          "y": 1,
+          "w": 43,
+          "h": 62,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "Ловушка - странная штука ",
+      "seconds": 127.166,
+      "updated": "2026-09-21T17:13:58.225142+00:00"
+    },
+    "1.2.643.5.1.13.13.12.2.77.8252.09050515110402090102050206010406": {
+      "state": "draft",
+      "y_foreign": 0,
+      "boxes": [
+        {
+          "shape": "line",
+          "x1": 194,
+          "y1": 7,
+          "x2": 266,
+          "y2": 72,
+          "thickness": 14,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        },
+        {
+          "shape": "line",
+          "x1": 99,
+          "y1": 16,
+          "x2": 38,
+          "y2": 96,
+          "thickness": 14,
+          "kind": "hard_negative",
+          "class": "край кости",
+          "sure": true
+        }
+      ],
+      "comment": "",
+      "seconds": 23.323,
+      "updated": "2026-09-21T17:14:14.430874+00:00"
+    }
+  }
+}
