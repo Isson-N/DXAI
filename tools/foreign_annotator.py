@@ -661,6 +661,7 @@ class Application:
                 "schema": SCHEMA,
                 "annotator": self.args.annotator,
                 "images": images,
+                "queue_mode": bool(getattr(self.args, "queue", None)),
                 "first_run": not bool(self.data["images"]),
             }
 
@@ -1159,7 +1160,9 @@ function renderBoxes(){
 function render(){
  $("who").textContent=state?"Разметчик: "+state.annotator:"";
  let done=items.filter(x=>x.annotated).length;
- $("progress").textContent=`Размечено ${done} из ${items.length}`;
+ $("progress").textContent=state&&state.queue_mode?
+  `Ранее отмечено: ${done} из ${items.length}`:
+  `Размечено ${done} из ${items.length}`;
  $("info").innerHTML=current?
   `<b>${current.y_foreign?"Положительный":"Отрицательный"} снимок</b>
    · ${index+1}/${items.length}<br>
@@ -1495,7 +1498,8 @@ async function boot(){
   items=state.images;
   render();
   resize();
-  await load(items.find(x=>!x.annotated)||items[0])
+  // В режиме очереди сначала показываем самый важный снимок, даже если он уже отмечен.
+  await load(state.queue_mode?items[0]:(items.find(x=>!x.annotated)||items[0]))
  }catch(e){
   showError(e.message)
  }
