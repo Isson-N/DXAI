@@ -900,7 +900,13 @@ function enqueue(){
 }
 function mutate(fn){
  if(!active())return;
- account();fn();ann.updated=new Date().toISOString();enqueue();render();
+ account();fn();
+ // Рамка означает, что подтверждение отсутствия предметов больше не актуально.
+ // Сбрасываем его в черновик, чтобы сервер мог принять новую разметку.
+ if(ann.boxes.length&&(
+   ann.state==="empty_confirmed"||ann.state==="skipped"
+ ))ann.state="draft";
+ ann.updated=new Date().toISOString();enqueue();render();
 }
 function native(p){return{x:(p.x-ox)/zoom,y:(p.y-oy)/zoom}}
 function screen(p){return{x:p.x*zoom+ox,y:p.y*zoom+oy}}
