@@ -1033,3 +1033,13 @@ fable 5.1 (--no-stream --max-tokens 16000) — второе мнение; codex 
   .venv/bin/python -u training/train_foreign_patches.py --patches ~/dxa_work/tr.npz \
      --scan ~/dxa_work/scan.npz --epochs 40 --seeds 1,2,3,7,42 \
      --out experiments/results/foreign_patch_ens --final-model ~/dxa_work/foreign_patch.pt
+- 22.09.2026: codex встроил патч-классификатор в сервис (src/dxaqc/foreign_patch.py, ансамбль
+  --seeds/--final-model, service_model читает models/foreign_patch.pt, training/time_foreign.py).
+  Найдены и исправлены мной два дефекта его кода:
+  (1) импорт `from src.dxaqc` — пакет установлен как dxaqc, сборщик не запускался;
+  (2) КРИТИЧНЫЙ ТИХИЙ: ForeignPatchModel.probability() не нормировал пиксели, а сервис передаёт
+      сырые (после инверсии MONOCHROME1) — сеть получала бы значения в сотни раз больше
+      обучающих и выдавала мусор без единой ошибки. Добавлена общая normalize(), проверено:
+      путь сервиса (io.read_image -> normalize) побитово совпадает с путём обучения на 5 снимках.
+  Сборщик после рефакторинга даёт те же 20188 окон, np.allclose со старым кодом — True.
+  Тесты: 26 passed (тесты с torch пропускаются локально — torch только на Aldan).

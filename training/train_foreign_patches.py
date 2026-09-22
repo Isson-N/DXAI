@@ -25,9 +25,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+from dxaqc.foreign_patch import PatchNet
 
 
-class PatchNet(nn.Module):
+'''class PatchNet(nn.Module):
     """Небольшая свёрточная сеть: 79 положительных окон не прокормят крупную модель."""
 
     def __init__(self, width: int = 32):
@@ -46,6 +47,7 @@ class PatchNet(nn.Module):
 
     def forward(self, x):
         return self.head(self.body(x).flatten(1)).squeeze(-1)
+'''
 
 
 def augment(batch: torch.Tensor) -> torch.Tensor:
@@ -130,8 +132,13 @@ def main() -> None:
     parser.add_argument("--out", default="experiments/results/foreign_patch")
     parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seeds", default=None, help="через запятую")
+    parser.add_argument("--final-model", default=None)
+    parser.add_argument("--size", type=int, default=96)
+    parser.add_argument("--stride", type=int, default=16)
     parser.add_argument("--device", default="auto")
     args = parser.parse_args()
+    seeds = [int(x) for x in args.seeds.split(',')] if args.seeds else [args.seed]
 
     device = ("cuda" if torch.cuda.is_available() else "cpu") if args.device == "auto" else args.device
     data = np.load(args.patches, allow_pickle=True)

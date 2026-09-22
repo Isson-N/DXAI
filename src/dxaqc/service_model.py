@@ -26,6 +26,7 @@ from .io import DicomImage
 from .labels import (REGION_HIP, REGION_SPINE, V_AXIS, V_FOREIGN, V_POSITIONING, V_ROI,
                      VIOLATIONS)
 from .model import Prediction
+from .foreign_patch import ForeignPatchModel
 
 # Головы CNN в том же порядке, что в training/train_baselines.py
 CNN_HEADS = ("region", "spine_any", "spine_pos", "spine_axis", "spine_foreign",
@@ -57,6 +58,7 @@ class ServiceModel:
 
     keypoints: object | None = None          # dxaqc.keypoints.SpineKeypointModel
     cnn: object | None = None                # обёртка над B2 (интерфейс: probabilities(image) -> dict)
+    foreign: ForeignPatchModel | None = None
     thresholds: dict[str, float] = field(default_factory=dict)
     version: str = "geometry+cnn-1"
     notes: list[str] = field(default_factory=list)
@@ -94,6 +96,9 @@ class ServiceModel:
                     continue
                 if head in cnn_probs:
                     probabilities[name] = float(cnn_probs[head])
+        if region == REGION_SPINE and self.foreign is not None:
+            probabilities[V_FOREIGN] = self.foreign.probability(np.asarray(image.pixels))
+            thresholds[V_FOREIGN] = self.foreign.threshold
 
         any_head = "spine_any" if region == REGION_SPINE else "hip_any"
         if cnn_probs is not None and any_head in cnn_probs:
@@ -130,4 +135,11 @@ def load(models_dir: str | Path, device: str = "cpu") -> ServiceModel:
             model.notes.append(f"CNN не загружена: {exc}")
     else:
         model.notes.append(f"нет файла {cnn_path.name}")
+    foreign_path = directory / "foreign_patch.pt"
+    if foreign_path.exists():
+        try:
+            model.foreign = ForeignPatchModel.load(foreign_path, device)
+            model.version = "geometry+cnn+patch-1"
+        except ImportError as exc:
+            model.notes.append(f"патч-модель не загружена: {exc}")
     return model

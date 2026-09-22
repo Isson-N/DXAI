@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pydicom
+from dxaqc.foreign_patch import read_image, extract_patch, grid_starts
 
 
 DEFAULT_ANNOTATIONS = (
@@ -77,7 +78,7 @@ def box_geometry(box: dict) -> tuple[float, float, float, tuple[float, float, fl
     raise ValueError(f"Неизвестная форма рамки: {shape!r}")
 
 
-def read_image(path: Path) -> np.ndarray:
+'''def read_image(path: Path) -> np.ndarray:
     ds = pydicom.dcmread(path)
     arr = np.asarray(ds.pixel_array).astype(np.float32)
     if arr.ndim != 2:
@@ -90,9 +91,10 @@ def read_image(path: Path) -> np.ndarray:
     else:
         arr = np.zeros_like(arr, dtype=np.float32)
     return arr.astype(np.float32, copy=False)
+'''
 
 
-def extract_patch(image: np.ndarray, cx: float, cy: float, size: int) -> np.ndarray:
+'''def extract_patch(image: np.ndarray, cx: float, cy: float, size: int) -> np.ndarray:
     # Округление центра определяет единственную целочисленную сетку без ресайза.
     x0 = int(np.floor(cx - size / 2))
     y0 = int(np.floor(cy - size / 2))
@@ -114,6 +116,7 @@ def extract_patch(image: np.ndarray, cx: float, cy: float, size: int) -> np.ndar
             pads = [pads[0] - t, pads[1] - b, pads[2] - l, pads[3] - r]
         return padded[y0 + top:y1 + top, x0 + left:x1 + left]
     return image[y0:y1, x0:x1]
+'''
 
 
 def overlap_fraction(x0: int, y0: int, size: int, bounds: tuple[float, ...]) -> float:
@@ -149,11 +152,12 @@ def coverage(box: dict, x0: int, y0: int, size: int) -> float:
     return segment_rect_length(x1, y1, x2, y2, x0, y0, x0 + size, y0 + size) / total if total else 0.0
 
 
-def grid_starts(length: int, size: int, stride: int) -> list[int]:
+'''def grid_starts(length: int, size: int, stride: int) -> list[int]:
     if length <= size: return [0]
     vals = list(range(0, length - size + 1, stride))
     if vals[-1] != length - size: vals.append(length - size)
     return vals
+'''
 
 
 def main() -> None:
