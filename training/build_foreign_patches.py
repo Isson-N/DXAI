@@ -21,7 +21,11 @@ DEFAULT_ANNOTATIONS = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--size", type=int, default=64, help="сторона патча (по умолчанию: 64)")
+    parser.add_argument("--size", type=int, default=96, help="сторона окна (по умолчанию: 96)")
+    parser.add_argument("--stride", type=int, default=16, help="шаг сетки (по умолчанию: 16)")
+    parser.add_argument("--margin", type=float, default=24, help="зазор для фоновых окон")
+    parser.add_argument("--max-per-study", type=int, default=40, help="максимум отрицательных окон на study")
+    parser.add_argument("--no-centered", action="store_true", help="не добавлять центрированные патчи")
     parser.add_argument(
         "--background", type=int, default=3,
         help="число фоновых патчей на отрицательный снимок (по умолчанию: 3)",
@@ -36,6 +40,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--size должен быть положительным")
     if args.background < 0:
         parser.error("--background не может быть отрицательным")
+    if args.stride <= 0 or args.margin < 0 or args.max_per_study < 0:
+        parser.error("stride должен быть положительным, margin/max-per-study — неотрицательными")
     return args
 
 
@@ -116,6 +122,39 @@ def overlap_fraction(x0: int, y0: int, size: int, bounds: tuple[float, ...]) -> 
     return width * height / (size * size)
 
 
+def segment_rect_length(x1, y1, x2, y2, rx0, ry0, rx1, ry1) -> float:
+    """Длина части отрезка, лежащей внутри прямоугольника (Liang--Barsky)."""
+    dx, dy = x2 - x1, y2 - y1
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x1 - rx0), (dx, rx1 - x1), (-dy, y1 - ry0), (dy, ry1 - y1)):
+        if p == 0:
+            if q < 0: return 0.0
+        else:
+            t = q / p
+            if p < 0: t0 = max(t0, t)
+            else: t1 = min(t1, t)
+            if t0 > t1: return 0.0
+    return max(0.0, t1 - t0) * float(np.hypot(dx, dy))
+
+
+def coverage(box: dict, x0: int, y0: int, size: int) -> float:
+    if box.get("shape") == "rect":
+        bx, by, bw, bh = (float(box[k]) for k in ("x", "y", "w", "h"))
+        area = abs(bw * bh)
+        if area == 0: return 0.0
+        return max(0.0, min(x0 + size, bx + bw) - max(x0, bx)) * max(0.0, min(y0 + size, by + bh) - max(y0, by)) / area
+    x1, y1, x2, y2 = (float(box[k]) for k in ("x1", "y1", "x2", "y2"))
+    total = float(np.hypot(x2 - x1, y2 - y1))
+    return segment_rect_length(x1, y1, x2, y2, x0, y0, x0 + size, y0 + size) / total if total else 0.0
+
+
+def grid_starts(length: int, size: int, stride: int) -> list[int]:
+    if length <= size: return [0]
+    vals = list(range(0, length - size + 1, stride))
+    if vals[-1] != length - size: vals.append(length - size)
+    return vals
+
+
 def main() -> None:
     args = parse_args()
     annotations = load_annotations()
@@ -129,10 +168,10 @@ def main() -> None:
     if missing:
         raise KeyError(f"В images.csv отсутствуют SOP UID ({len(missing)}): {missing[:3]}")
 
-    patches, labels, uids, studies, out_folds, sources, box_sizes = ([] for _ in range(7))
+    patches, labels, uids, studies, out_folds, sources, box_sizes, windows, coverages = ([] for _ in range(9))
 
     def append(patch: np.ndarray, label: int, uid: str, study: str,
-               fold: int, source: str, box_size: float) -> None:
+               fold: int, source: str, box_size: float, is_window: bool, cov: float) -> None:
         patches.append(patch)
         labels.append(label)
         uids.append(uid)
@@ -140,6 +179,8 @@ def main() -> None:
         out_folds.append(fold)
         sources.append(source)
         box_sizes.append(box_size)
+        windows.append(is_window)
+        coverages.append(cov)
 
     rng = np.random.default_rng(args.seed)
     for uid, versions in annotations.items():
@@ -157,26 +198,42 @@ def main() -> None:
             if kind not in {"object", "hard_negative"}:
                 raise ValueError(f"Неизвестный kind для {uid}: {kind!r}")
             cx, cy, box_size, _ = box_geometry(box)
-            append(extract_patch(image, cx, cy, args.size), int(kind == "object"),
-                   uid, study, fold, kind, box_size)
+            if not args.no_centered:
+                append(extract_patch(image, cx, cy, args.size), int(kind == "object"),
+                       uid, study, fold, kind, box_size, False, 1.0)
 
-        # При нескольких разметках требуем единогласную отрицательную метку.
-        if args.background and all(v.get("y_foreign") == 0 for v in versions):
-            height, width = image.shape
-            accepted = 0
-            attempts = 0
-            max_attempts = max(1000, args.background * 1000)
-            while accepted < args.background and attempts < max_attempts:
-                attempts += 1
-                x0 = int(rng.integers(0, max(1, width - args.size + 1)))
-                y0 = int(rng.integers(0, max(1, height - args.size + 1)))
-                if any(overlap_fraction(x0, y0, args.size, b) > 0.2 for b in bounds):
+        height, width = image.shape
+        negative_candidates = []
+        ambiguous = 0
+        for y0 in grid_starts(height, args.size, args.stride):
+            for x0 in grid_starts(width, args.size, args.stride):
+                object_cov = [coverage(b, x0, y0, args.size) for b in all_boxes if b.get("kind") == "object"]
+                trap_cov = [coverage(b, x0, y0, args.size) for b in all_boxes if b.get("kind") == "hard_negative"]
+                if object_cov and max(object_cov) >= 0.5:
+                    append(extract_patch(image, x0 + args.size / 2, y0 + args.size / 2, args.size), 1,
+                           uid, study, fold, "window_object", 0.0, True, float(max(object_cov)))
                     continue
-                append(extract_patch(image, x0 + args.size / 2, y0 + args.size / 2,
-                                     args.size), 0, uid, study, fold, "background", 0.0)
-                accepted += 1
-            if accepted < args.background:
-                raise RuntimeError(f"Для {uid} найдено только {accepted} фоновых патчей")
+                # Близость к рамке: расстояние между окном и её ограничивающим прямоугольником.
+                # Зазор нужен только вокруг ОБЪЕКТОВ: окно рядом с ловушкой — это
+                # и есть самый ценный отрицательный пример, выбрасывать его нельзя.
+                near = False
+                for b in [b for b in all_boxes if b.get("kind") == "object"]:
+                    bx0, by0, bx1, by1 = box_geometry(b)[3]
+                    dx = max(bx0 - (x0 + args.size), x0 - bx1, 0)
+                    dy = max(by0 - (y0 + args.size), y0 - by1, 0)
+                    if np.hypot(dx, dy) < args.margin:
+                        near = True; break
+                if any(c > 0 for c in object_cov) or near:
+                    ambiguous += 1
+                    continue
+                negative_candidates.append((x0, y0, "window_trap" if trap_cov and max(trap_cov) >= 0.5 else "window_background", float(max(trap_cov) if trap_cov else 0.0)))
+        # Ограничение применяется только к отрицательным окнам одного исследования.
+        if len(negative_candidates) > args.max_per_study:
+            chosen = rng.choice(len(negative_candidates), args.max_per_study, replace=False)
+            negative_candidates = [negative_candidates[int(i)] for i in chosen]
+        for x0, y0, source, cov in negative_candidates:
+            append(extract_patch(image, x0 + args.size / 2, y0 + args.size / 2, args.size), 0,
+                   uid, study, fold, source, 0.0, True, cov)
 
     arrays = {
         "patches": np.stack(patches).astype(np.float32),
@@ -186,6 +243,8 @@ def main() -> None:
         "fold": np.asarray(out_folds, dtype=np.int8),
         "source": np.asarray(sources, dtype=str),
         "box_size": np.asarray(box_sizes, dtype=np.float32),
+        "window": np.asarray(windows, dtype=bool),
+        "coverage": np.asarray(coverages, dtype=np.float32),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(args.out, **arrays)
@@ -194,6 +253,7 @@ def main() -> None:
     print("Классы:", dict(sorted(Counter(labels).items())))
     print("Источники:", dict(sorted(Counter(sources).items())))
     print("Фолды:", dict(sorted(Counter(out_folds).items())))
+    print("Исследования:", dict(sorted(Counter(studies).items())))
 
 
 if __name__ == "__main__":
