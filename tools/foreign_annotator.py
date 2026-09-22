@@ -213,6 +213,34 @@ class Application:
                     raise ValueError("В CSV найден пустой sop_uid.")
                 rows.append(row)
 
+        hotspots_by_uid = {}
+        hotspots_file = getattr(args, "hotspots", None)
+        if hotspots_file:
+            with open(hotspots_file, newline="", encoding="utf-8-sig") as stream:
+                reader = csv.DictReader(stream)
+                required_hotspots = {"sop_uid", "x", "y", "score", "rank"}
+                fields = set(reader.fieldnames or [])
+                missing = required_hotspots - fields
+                if missing:
+                    raise ValueError("В CSV подсказок отсутствуют столбцы: " + ", ".join(sorted(missing)))
+                for row in reader:
+                    uid = (row.get("sop_uid") or "").strip()
+                    if not uid:
+                        raise ValueError(f"В CSV подсказок пустой sop_uid в строке {reader.line_num}.")
+                    try:
+                        x, y = float(row["x"]), float(row["y"])
+                        score = float(row["score"])
+                        rank = int(row["rank"])
+                    except (TypeError, ValueError):
+                        raise ValueError(f"В CSV подсказок битое число в строке {reader.line_num}.")
+                    if not all(math.isfinite(v) for v in (x, y, score)) or not 0.5 <= score <= 1.0:
+                        raise ValueError(f"В CSV подсказок некорректное число в строке {reader.line_num}.")
+                    hotspots_by_uid.setdefault(uid, []).append({"x": x, "y": y, "score": score, "rank": rank})
+            indexed_uids = {r["sop_uid"].strip() for r in rows}
+            unknown = sum(uid not in indexed_uids for uid in hotspots_by_uid)
+            if unknown:
+                print(f"В подсказках не найдено в индексе sop_uid: {unknown}", flush=True)
+
         # Стабильный порядок, не зависящий от порядка строк CSV.
         rows.sort(
             key=lambda row: (
@@ -347,6 +375,7 @@ class Application:
                 "y_foreign": binary_label(row["y_foreign"]),
                 "region": row["region"].strip(),
                 "error": error,
+                "hotspots": hotspots_by_uid.get(uid, []),
             }
             self.order.append(uid)
             if png is not None:
@@ -789,6 +818,7 @@ D — удалить последний, Delete — удалить выбран�
 Колесо — зум, ПКМ или Space + мышь — панорамирование.<br>
 U помечает выбранный элемент как неуверенный; если ничего не выбрано,
 U включается для следующего элемента.
+M переключает показ подсказок модели.
 </div>
 </aside>
 </main>
@@ -808,6 +838,7 @@ let state=null,items=[],current=null,ann=null,index=-1,imageObj=null;
 let mode="object",shapeMode="rect",className=OBJECTS[0],sure=true,selected=-1;
 let lineThickness=6;
 let zoom=1,ox=0,oy=0,W=1,H=1,gesture=null,space=false;
+let showHotspots=true;
 let last=performance.now(),pending=false,saveOK=true,saveQueue=Promise.resolve();
 
 function copy(x){return JSON.parse(JSON.stringify(x))}
@@ -978,6 +1009,14 @@ function draw(){
   )
  }
  if(!ann)return;
+ if(showHotspots && current.hotspots){
+  current.hotspots.forEach(h=>{
+   let p=screen(h), color=h.score>0.9?"#ff4545":"#ff9f32";
+   c.save(); c.strokeStyle=color; c.lineWidth=2;
+   c.beginPath(); c.arc(p.x,p.y,48*zoom,0,Math.PI*2); c.stroke();
+   c.font="11px system-ui"; c.fillStyle=color; c.fillText(Number(h.score).toFixed(2),p.x+50*zoom,p.y-50*zoom); c.restore();
+  });
+ }
  ann.boxes.forEach((q,i)=>{
   let sel=i===selected;
   if(shapeOf(q)==="line"){
@@ -1434,6 +1473,7 @@ document.onkeydown=e=>{
 };
 document.onkeyup=e=>{
  if(e.code==="Space")space=false
+ if(e.code==="KeyM"){showHotspots=!showHotspots;draw()}
 };
 window.onresize=resize;
 window.onblur=()=>{
@@ -1650,6 +1690,10 @@ def main():
     parser.add_argument(
         "--queue",
         help="CSV с колонкой uid: показывать только эти снимки в заданном порядке",
+    )
+    parser.add_argument(
+        "--hotspots",
+        help="CSV подсказок модели (sop_uid, x, y, score, rank)",
     )
     parser.add_argument(
         "--part",
