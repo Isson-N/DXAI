@@ -1175,3 +1175,11 @@ fable 5.1 (--no-stream --max-tokens 16000) — второе мнение; codex 
   Критерий (выше на всех seed, среднее +0,02) пройден -> внедряем. Запущены: nested-оценка с --init
   (experiments/results/foreign_patch_nested_pre) и финальный ансамбль 5 seed с --init
   (~/dxa_work/foreign_patch_pre.pt; порог заменить на медиану nested-порогов).
+- 23.09.2026, ИТОГ ПРЕДОБУЧЕНИЯ: nested с --init — F1 0,833 (TP15 FP4 FN2), AUC 0,923, против старой
+  головы +0,62 [+0,43,+0,81]; агрегация max во всех фолдах, пороги 0,96-0,99 (медиана 0,978).
+  В СЕРВИСЕ: models/foreign_patch.pt = ансамбль 5 seed с предобучением, порог 0,978,
+  версия patch-ens5-20260923-ocxrpre-nestedthr (копия на Aldan ~/dxa/models).
+  models/foreign_patch_scratch.pt — прежний без предобучения, models/ocxr_pretrain.pt — веса
+  предобучения. Прогноз macro-F1 сервиса: (0,909+0,455+0,833+0,583+0,571)/5 ≈ 0,670.
+  Для воспроизведения: training/build_ocxr_patches.py -> pretrain_foreign.py -> train_foreign_patches.py
+  --init (команды в логе scratchpad; данные ~/dxa_work/ocxr, подвыборка pick.txt).
