@@ -168,10 +168,11 @@ def main() -> None:
     if missing:
         raise KeyError(f"В images.csv отсутствуют SOP UID ({len(missing)}): {missing[:3]}")
 
-    patches, labels, uids, studies, out_folds, sources, box_sizes, windows, coverages = ([] for _ in range(9))
+    patches, labels, uids, studies, out_folds, sources, box_sizes, windows, coverages, center_x, center_y = ([] for _ in range(11))
 
     def append(patch: np.ndarray, label: int, uid: str, study: str,
-               fold: int, source: str, box_size: float, is_window: bool, cov: float) -> None:
+               fold: int, source: str, box_size: float, is_window: bool, cov: float,
+               cx: float, cy: float) -> None:
         patches.append(patch)
         labels.append(label)
         uids.append(uid)
@@ -181,6 +182,8 @@ def main() -> None:
         box_sizes.append(box_size)
         windows.append(is_window)
         coverages.append(cov)
+        center_x.append(cx)
+        center_y.append(cy)
 
     rng = np.random.default_rng(args.seed)
     for uid, versions in annotations.items():
@@ -200,7 +203,7 @@ def main() -> None:
             cx, cy, box_size, _ = box_geometry(box)
             if not args.no_centered:
                 append(extract_patch(image, cx, cy, args.size), int(kind == "object"),
-                       uid, study, fold, kind, box_size, False, 1.0)
+                       uid, study, fold, kind, box_size, False, 1.0, cx, cy)
 
         height, width = image.shape
         negative_candidates = []
@@ -211,7 +214,8 @@ def main() -> None:
                 trap_cov = [coverage(b, x0, y0, args.size) for b in all_boxes if b.get("kind") == "hard_negative"]
                 if object_cov and max(object_cov) >= 0.5:
                     append(extract_patch(image, x0 + args.size / 2, y0 + args.size / 2, args.size), 1,
-                           uid, study, fold, "window_object", 0.0, True, float(max(object_cov)))
+                           uid, study, fold, "window_object", 0.0, True, float(max(object_cov)),
+                           x0 + args.size / 2, y0 + args.size / 2)
                     continue
                 # Близость к рамке: расстояние между окном и её ограничивающим прямоугольником.
                 # Зазор нужен только вокруг ОБЪЕКТОВ: окно рядом с ловушкой — это
@@ -233,7 +237,8 @@ def main() -> None:
             negative_candidates = [negative_candidates[int(i)] for i in chosen]
         for x0, y0, source, cov in negative_candidates:
             append(extract_patch(image, x0 + args.size / 2, y0 + args.size / 2, args.size), 0,
-                   uid, study, fold, source, 0.0, True, cov)
+                   uid, study, fold, source, 0.0, True, cov,
+                   x0 + args.size / 2, y0 + args.size / 2)
 
     arrays = {
         "patches": np.stack(patches).astype(np.float32),
@@ -245,6 +250,8 @@ def main() -> None:
         "box_size": np.asarray(box_sizes, dtype=np.float32),
         "window": np.asarray(windows, dtype=bool),
         "coverage": np.asarray(coverages, dtype=np.float32),
+        "center_x": np.asarray(center_x, dtype=np.float32),
+        "center_y": np.asarray(center_y, dtype=np.float32),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(args.out, **arrays)

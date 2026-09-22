@@ -85,14 +85,20 @@ def train_fold(x, y, weights, device, epochs, seed):
     return model.eval()
 
 
-def image_scores(model, x, uids, device, batch=256) -> dict[str, float]:
-    """Оценка снимка — максимум по его окнам (основной вариант протокола)."""
+def window_scores(model, x, device, batch=256) -> np.ndarray:
+    """Оценка каждого окна: нужна не только для агрегации, но и для карт —
+    по ним видно, ГДЕ модель ошибается, и куда разметчику смотреть."""
     scores = []
     with torch.no_grad():
         for start in range(0, len(x), batch):
             chunk = x[start:start + batch].to(device)
             scores.append(torch.sigmoid(model(chunk)).cpu().numpy())
-    scores = np.concatenate(scores) if scores else np.zeros(0)
+    return np.concatenate(scores) if scores else np.zeros(0)
+
+
+def image_scores(model, x, uids, device, batch=256) -> dict[str, float]:
+    """Оценка снимка — максимум по его окнам (основной вариант протокола)."""
+    scores = window_scores(model, x, device, batch)
     result: dict[str, float] = {}
     for uid, score in zip(uids, scores):
         result[uid] = max(result.get(uid, 0.0), float(score))
@@ -145,7 +151,7 @@ def main() -> None:
                     if u in index.index and pd.notna(index.loc[u, "y_foreign"])}
 
     started = time.time()
-    rows = []
+    rows, window_rows = [], []
     for outer in sorted(set(folds)):
         test = folds == outer
         train = ~test
@@ -162,6 +168,9 @@ def main() -> None:
             np.asarray([inner_scores[u] for u in inner_uids]),
             np.asarray([truth_by_uid[u] for u in inner_uids]))
 
+        raw = window_scores(model, patches[test], device)
+        window_rows.extend({"sop_uid": u, "score": float(v), "fold": outer}
+                           for u, v in zip(uids[test], raw))
         test_scores = image_scores(model, patches[test], uids[test], device)
         for uid, score in test_scores.items():
             if uid in truth_by_uid:
@@ -178,6 +187,7 @@ def main() -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     frame.to_csv(out / "oof.csv", index=False)
+    pd.DataFrame(window_rows).to_csv(out / "windows.csv", index=False)
     report = {"f1": round(score, 4), "n": int(len(frame)),
               "n_positive": int(frame.y_true.sum()),
               "tp": int(((frame.y_pred == 1) & (frame.y_true == 1)).sum()),

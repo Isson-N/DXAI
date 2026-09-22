@@ -236,13 +236,52 @@ class Application:
         queue_file = getattr(self.args, "queue", None)
         if queue_file:
             with open(queue_file, newline="", encoding="utf-8-sig") as stream:
-                wanted = [r["uid"].strip() for r in csv.DictReader(stream) if r.get("uid")]
+                reader = csv.DictReader(stream)
+                fields = list(reader.fieldnames or [])
+                if "uid" not in fields:
+                    raise ValueError(
+                        "В CSV очереди отсутствует столбец uid. "
+                        "Найдены столбцы: "
+                        + (", ".join(fields) if fields else "нет")
+                    )
+                wanted = []
+                seen = set()
+                duplicates = []
+                for row in reader:
+                    uid = (row.get("uid") or "").strip()
+                    if not uid:
+                        raise ValueError(
+                            f"В CSV очереди найден пустой uid в строке {reader.line_num}."
+                        )
+                    if uid in seen:
+                        if uid not in duplicates and len(duplicates) < 5:
+                            duplicates.append(uid)
+                    else:
+                        seen.add(uid)
+                    wanted.append(uid)
+                if duplicates:
+                    raise ValueError(
+                        "В CSV очереди найдены дубликаты uid: "
+                        + ", ".join(duplicates)
+                    )
             position = {uid: i for i, uid in enumerate(wanted)}
+            indexed = {r["sop_uid"].strip() for r in rows}
+            unknown = [uid for uid in wanted if uid not in indexed]
+            if unknown:
+                print(
+                    f"В очереди не найдено в индексе uid: {len(unknown)} "
+                    f"(первые 5: {', '.join(unknown[:5])})",
+                    flush=True,
+                )
             rows = [r for r in rows if r["sop_uid"].strip() in position]
+            if not rows:
+                raise ValueError("В очереди нет снимков, найденных в индексе.")
             rows.sort(key=lambda row: position[row["sop_uid"].strip()])
             print(f"очередь из файла: {len(rows)} снимков", flush=True)
 
         part = str(getattr(self.args, "part", "all"))
+        if queue_file and part != "all":
+            print("Предупреждение: --part игнорируется в пользу --queue.", flush=True)
         if part != "all" and not queue_file:
             all_studies = [r["study"].strip() for r in rows]
             print(
@@ -257,10 +296,16 @@ class Application:
             )
             rows = [r for r in rows if r["study"].strip() in mine]
 
-        priority = read_scores(
-            getattr(self.args, "scores", None),
-            rows,
-            getattr(self.args, "priority_top", 40),
+        scores_file = getattr(self.args, "scores", None)
+        if queue_file and scores_file:
+            print(
+                "Предупреждение: при --queue порядок берётся из очереди, --scores не применяется.",
+                flush=True,
+            )
+        priority = (
+            read_scores(scores_file, rows, getattr(self.args, "priority_top", 40))
+            if not queue_file
+            else set()
         )
         if priority:
             rows.sort(
