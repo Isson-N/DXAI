@@ -997,3 +997,39 @@ fable 5.1 (--no-stream --max-tokens 16000) — второе мнение; codex 
   вывод устойчив: худший из 8 прогонов 0,591. Разброс между seed (0,65-0,79) больше разницы
   между вариантами — ЛЮБЫЕ сравнения вариантов теперь только по нескольким seed.
   Прогноз macro сервиса при замене головы: 0,546 -> ~0,64.
+
+## ПЕРЕДАЧА РАБОТЫ (22.09.2026, у Claude осталось ~10% недельного лимита)
+Финальную сборку и оформление доделывают codex или коллаборатор. Работать в ЭТОЙ папке
+(git). Папка ~/projects/dxa-quality-ai-copy — копия codex с IMPROVINGS.md (аудит gpt sol).
+Доступ к Aldan только у пользователя/Claude — задания на кластер codex не даётся.
+
+### Приоритеты (по убыванию пользы)
+1. [В РАБОТЕ] Патч-классификатор предметов в сервис: src/dxaqc/foreign_patch.py
+   (общая нормировка и окна для обучения и сервиса), ансамбль seed в
+   training/train_foreign_patches.py (--seeds, --final-model), подключение в
+   src/dxaqc/service_model.py (foreign_patch.pt в каталоге весов), замер времени
+   training/time_foreign.py. Ожидание: голова «предметы» 0,21 -> ~0,70, macro 0,546 -> ~0,64.
+   Обучение финальной модели — на Aldan (см. команду ниже), веса -> models/foreign_patch.pt.
+   Это ОТКЛОНЕНИЕ от docs/final_protocol.md (маршрутизация «предметы -> CNN» была
+   зафиксирована): дописать туда раздел «Отклонения» с обоснованием (+0,58 к старой голове,
+   ДИ [+0,38,+0,77], разброс по seed 0,65-0,79).
+2. КРИТИЧНО ДЛЯ СДАЧИ: requirements.txt контейнера не содержит torch/timm, а ServiceModel
+   на них работает (находка sol, IMPROVINGS.md). Зафиксировать версии (на Aldan torch 2.8.0,
+   см. experiments/results/*/metrics.json -> environment), собрать контейнер, прогнать
+   docker/smoke_test.sh БЕЗ --stub на data/test с настоящими весами (models/*.pt).
+3. Проверить формат выходного CSV против ТЗ (колонки в разделе «Суть ТЗ» выше) и лимит
+   3 мин на исследование — с патч-моделью ~210 окон на снимок, замер time_foreign.py.
+4. Геометрия оси (IMPROVINGS.md): если Th12 или L5 не найдены — сейчас хорда строится
+   по крайним оставшимся точкам. Менять только с переоценкой OOF.
+5. Отчёт: итоговое число сервиса пересчитать training/final_metric.py с новой головой
+   предметов; всё остальное — в experiments/*.md и разделе «Состояние на 22.09 вечер».
+
+### Команда обучения финальной модели предметов на Aldan
+  (файлы кода скопировать в ~/dxa через tar по ssh; npz — в ~/dxa_work, /tmp у узлов свой)
+  cd ~/dxa && .venv/bin/python training/build_foreign_patches.py --size 96 --stride 16 \
+     --out ~/dxa_work/tr.npz
+  .venv/bin/python training/build_foreign_patches.py --full-scan --size 96 --stride 16 \
+     --out ~/dxa_work/scan.npz
+  .venv/bin/python -u training/train_foreign_patches.py --patches ~/dxa_work/tr.npz \
+     --scan ~/dxa_work/scan.npz --epochs 40 --seeds 1,2,3,7,42 \
+     --out experiments/results/foreign_patch_ens --final-model ~/dxa_work/foreign_patch.pt
