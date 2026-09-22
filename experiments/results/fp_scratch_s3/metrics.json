@@ -1,0 +1,21 @@
+{
+ "f1": 0.6222,
+ "n": 99,
+ "n_positive": 17,
+ "tp": 14,
+ "fp": 14,
+ "fn": 3,
+ "epochs": 40,
+ "device": "cuda",
+ "seeds": [
+  3
+ ],
+ "fold_thresholds": [
+  0.9614,
+  0.8818,
+  0.9961,
+  0.9215,
+  0.7605
+ ],
+ "training_seconds": 161.7
+}
