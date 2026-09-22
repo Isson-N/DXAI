@@ -98,9 +98,16 @@ def window_scores(model, x, device, batch=256) -> np.ndarray:
     return np.concatenate(scores) if scores else np.zeros(0)
 
 
+def ensemble_scores(models, x, device, batch=256) -> np.ndarray:
+    """Среднее sigmoid по моделям ансамбля для каждого окна: гасит разброс между seed,
+    который при 17 положительных (0,65-0,79) больше разницы между вариантами."""
+    models = models if isinstance(models, (list, tuple)) else [models]
+    return np.mean([window_scores(m, x, device, batch) for m in models], axis=0)
+
+
 def image_scores(model, x, uids, device, batch=256) -> dict[str, float]:
     """Оценка снимка — максимум по его окнам (основной вариант протокола)."""
-    scores = window_scores(model, x, device, batch)
+    scores = ensemble_scores(model, x, device, batch)
     result: dict[str, float] = {}
     for uid, score in zip(uids, scores):
         result[uid] = max(result.get(uid, 0.0), float(score))
@@ -168,7 +175,7 @@ def main() -> None:
                     if u in index.index and pd.notna(index.loc[u, "y_foreign"])}
 
     started = time.time()
-    rows, window_rows = [], []
+    rows, window_rows, fold_thresholds = [], [], []
     for outer in sorted(set(folds)):
         test = folds == outer
         train = ~test
@@ -176,8 +183,9 @@ def main() -> None:
         inner = folds == (outer + 1) % (max(folds) + 1)
         fit = train & ~inner
 
-        model = train_fold(patches[fit], labels[fit], weights[fit],
-                           device, args.epochs, args.seed + outer)
+        # Раньше --seeds разбирался, но не использовался: обучалась одна модель.
+        model = [train_fold(patches[fit], labels[fit], weights[fit],
+                            device, args.epochs, seed * 100 + outer) for seed in seeds]
 
         eval_patches, eval_uids = (scan_patches[scan_folds == (outer + 1) % (max(folds) + 1)],
                                    scan_uids[scan_folds == (outer + 1) % (max(folds) + 1)]) if args.scan else (patches[inner], uids[inner])
@@ -186,14 +194,15 @@ def main() -> None:
         threshold = best_threshold(
             np.asarray([inner_scores[u] for u in inner_uids]),
             np.asarray([truth_by_uid[u] for u in inner_uids]))
+        fold_thresholds.append(float(threshold))
 
         if args.scan:
             scan_test = scan_folds == outer
-            raw = window_scores(model, scan_patches[scan_test], device)
+            raw = ensemble_scores(model, scan_patches[scan_test], device)
             win_uids, win_cx, win_cy = scan_uids[scan_test], scan_cx[scan_test], scan_cy[scan_test]
             test_scores = image_scores(model, scan_patches[scan_test], win_uids, device)
         else:
-            raw = window_scores(model, patches[test], device)
+            raw = ensemble_scores(model, patches[test], device)
             win_uids, win_cx, win_cy = uids[test], centre_x[test], centre_y[test]
             test_scores = image_scores(model, patches[test], uids[test], device)
         window_rows.extend(
@@ -220,12 +229,26 @@ def main() -> None:
               "tp": int(((frame.y_pred == 1) & (frame.y_true == 1)).sum()),
               "fp": int(((frame.y_pred == 1) & (frame.y_true == 0)).sum()),
               "fn": int(((frame.y_pred == 0) & (frame.y_true == 1)).sum()),
-              "epochs": args.epochs, "device": device,
+              "epochs": args.epochs, "device": device, "seeds": seeds,
+              "fold_thresholds": fold_thresholds,
               "training_seconds": round(time.time() - started, 1)}
     (out / "metrics.json").write_text(json.dumps(report, ensure_ascii=False, indent=1),
                                       encoding="utf-8")
     print(f"\nF1 на уровне снимка: {score:.4f}  (TP {report['tp']}, FP {report['fp']}, FN {report['fn']})")
     print(f"сохранено: {out}")
+
+    if args.final_model:
+        # Финальный ансамбль: по модели на seed, обучение на ВСЕХ окнах. Порог — медиана
+        # порогов, выбранных во внешних фолдах: на всех данных порог выбрать не на чем.
+        final = [train_fold(patches, labels, weights, device, args.epochs, seed) for seed in seeds]
+        payload = {"models": [{k: v.cpu() for k, v in m.state_dict().items()} for m in final],
+                   "threshold": float(np.median(fold_thresholds)),
+                   "size": args.size, "stride": args.stride,
+                   "version": f"patch-ens{len(seeds)}-" + time.strftime("%Y%m%d")}
+        Path(args.final_model).parent.mkdir(parents=True, exist_ok=True)
+        torch.save(payload, args.final_model)
+        print(f"финальная модель: {args.final_model}, порог {payload['threshold']:.3f}, "
+              f"моделей {len(final)}")
 
 
 if __name__ == "__main__":
