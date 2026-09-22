@@ -99,7 +99,7 @@ def main() -> None:
             if best is None or score > best[2]:
                 best = (name, th, score)
         name, threshold, inner_f1 = best
-        choices.append({"outer": outer, "aggregation": name, "threshold": threshold,
+        choices.append({"outer": int(outer), "aggregation": name, "threshold": threshold,
                         "inner_pooled_f1": round(inner_f1, 4)})
         # 3) модели на всей обучающей части -> внешний фолд, один раз
         models = fit(folds != outer, outer * 10 + 9)
