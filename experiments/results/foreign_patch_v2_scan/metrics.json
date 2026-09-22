@@ -1,0 +1,11 @@
+{
+ "f1": 0.5909,
+ "n": 99,
+ "n_positive": 17,
+ "tp": 13,
+ "fp": 14,
+ "fn": 4,
+ "epochs": 40,
+ "device": "cuda",
+ "training_seconds": 160.6
+}

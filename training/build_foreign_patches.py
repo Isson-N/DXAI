@@ -35,6 +35,7 @@ def parse_args() -> argparse.Namespace:
         help="выходной NPZ",
     )
     parser.add_argument("--seed", type=int, default=42, help="seed генератора фоновых патчей")
+    parser.add_argument("--full-scan", action="store_true", help="сохранить все окна сетки для всех снимков поясницы")
     args = parser.parse_args()
     if args.size <= 0:
         parser.error("--size должен быть положительным")
@@ -157,13 +158,42 @@ def grid_starts(length: int, size: int, stride: int) -> list[int]:
 
 def main() -> None:
     args = parse_args()
-    annotations = load_annotations()
     index = pd.read_csv("data/index/images.csv", dtype={"sop_uid": str, "study": str})
     folds = pd.read_csv("experiments/folds.csv", dtype={"study": str})
     if index["sop_uid"].duplicated().any():
         raise ValueError("В images.csv обнаружены повторяющиеся sop_uid")
     fold_map = folds.set_index("study")["fold"].to_dict()
     image_map = index.set_index("sop_uid").to_dict("index")
+    if args.full_scan:
+        patches, labels, uids, studies, out_folds, sources = [], [], [], [], [], []
+        center_x, center_y = [], []
+        for row in index[index["region"].astype(str).str.lower() == "spine"].itertuples(index=False):
+            uid, study = str(row.sop_uid), str(row.study)
+            if study not in fold_map:
+                raise KeyError(f"Для study {study} не найден fold")
+            image = read_image(Path(row.path))
+            height, width = image.shape
+            for y0 in grid_starts(height, args.size, args.stride):
+                for x0 in grid_starts(width, args.size, args.stride):
+                    patches.append(extract_patch(image, x0 + args.size / 2, y0 + args.size / 2, args.size))
+                    labels.append(-1); uids.append(uid); studies.append(study)
+                    out_folds.append(int(fold_map[study])); sources.append("scan")
+                    center_x.append(x0 + args.size / 2); center_y.append(y0 + args.size / 2)
+        arrays = {
+            "patches": np.stack(patches).astype(np.float32), "labels": np.asarray(labels, dtype=np.int8),
+            "sop_uid": np.asarray(uids, dtype=str), "study": np.asarray(studies, dtype=str),
+            "fold": np.asarray(out_folds, dtype=np.int8), "source": np.asarray(sources, dtype=str),
+            "box_size": np.zeros(len(labels), dtype=np.float32), "window": np.zeros(len(labels), dtype=bool),
+            "coverage": np.zeros(len(labels), dtype=np.float32),
+            "center_x": np.asarray(center_x, dtype=np.float32), "center_y": np.asarray(center_y, dtype=np.float32),
+        }
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(args.out, **arrays)
+        print(f"Сохранено: {args.out} ({len(labels)} патчей)")
+        print("Снимки:", len(set(uids)))
+        return
+
+    annotations = load_annotations()
     missing = sorted(set(annotations) - set(image_map))
     if missing:
         raise KeyError(f"В images.csv отсутствуют SOP UID ({len(missing)}): {missing[:3]}")

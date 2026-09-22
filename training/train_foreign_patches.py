@@ -125,6 +125,7 @@ def best_threshold(scores: np.ndarray, truth: np.ndarray) -> float:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--patches", default="experiments/results/foreign_patches.npz")
+    parser.add_argument("--scan", default=None, help="NPZ полного сканирования для оценки")
     parser.add_argument("--index", default="data/index/images.csv")
     parser.add_argument("--out", default="experiments/results/foreign_patch")
     parser.add_argument("--epochs", type=int, default=40)
@@ -143,6 +144,13 @@ def main() -> None:
     studies = np.asarray([str(s) for s in data["study"]])
     centre_x = np.asarray(data["center_x"], dtype=float) if "center_x" in data else np.zeros(len(uids))
     centre_y = np.asarray(data["center_y"], dtype=float) if "center_y" in data else np.zeros(len(uids))
+    if args.scan:
+        scan_data = np.load(args.scan, allow_pickle=True)
+        scan_patches = torch.from_numpy(scan_data["patches"]).float().unsqueeze(1)
+        scan_uids = np.asarray([str(u) for u in scan_data["sop_uid"]])
+        scan_folds = np.asarray(scan_data["fold"], dtype=int)
+        scan_cx = np.asarray(scan_data["center_x"], dtype=float) if "center_x" in scan_data else np.zeros(len(scan_uids))
+        scan_cy = np.asarray(scan_data["center_y"], dtype=float) if "center_y" in scan_data else np.zeros(len(scan_uids))
 
     # Вклад исследования не должен зависеть от того, сколько окон оно дало.
     counts = pd.Series(studies).value_counts()
@@ -164,17 +172,26 @@ def main() -> None:
         model = train_fold(patches[fit], labels[fit], weights[fit],
                            device, args.epochs, args.seed + outer)
 
-        inner_scores = image_scores(model, patches[inner], uids[inner], device)
+        eval_patches, eval_uids = (scan_patches[scan_folds == (outer + 1) % (max(folds) + 1)],
+                                   scan_uids[scan_folds == (outer + 1) % (max(folds) + 1)]) if args.scan else (patches[inner], uids[inner])
+        inner_scores = image_scores(model, eval_patches, eval_uids, device)
         inner_uids = [u for u in inner_scores if u in truth_by_uid]
         threshold = best_threshold(
             np.asarray([inner_scores[u] for u in inner_uids]),
             np.asarray([truth_by_uid[u] for u in inner_uids]))
 
-        raw = window_scores(model, patches[test], device)
+        if args.scan:
+            scan_test = scan_folds == outer
+            raw = window_scores(model, scan_patches[scan_test], device)
+            win_uids, win_cx, win_cy = scan_uids[scan_test], scan_cx[scan_test], scan_cy[scan_test]
+            test_scores = image_scores(model, scan_patches[scan_test], win_uids, device)
+        else:
+            raw = window_scores(model, patches[test], device)
+            win_uids, win_cx, win_cy = uids[test], centre_x[test], centre_y[test]
+            test_scores = image_scores(model, patches[test], uids[test], device)
         window_rows.extend(
             {"sop_uid": u, "score": float(v), "fold": outer, "x": float(cx), "y": float(cy)}
-            for u, v, cx, cy in zip(uids[test], raw, centre_x[test], centre_y[test]))
-        test_scores = image_scores(model, patches[test], uids[test], device)
+            for u, v, cx, cy in zip(win_uids, raw, win_cx, win_cy))
         for uid, score in test_scores.items():
             if uid in truth_by_uid:
                 rows.append({"sop_uid": uid, "fold": outer, "score": score,
