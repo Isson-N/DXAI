@@ -141,6 +141,8 @@ def main() -> None:
     uids = np.asarray([str(u) for u in data["sop_uid"]])
     folds = np.asarray(data["fold"], dtype=int)
     studies = np.asarray([str(s) for s in data["study"]])
+    centre_x = np.asarray(data["center_x"], dtype=float) if "center_x" in data else np.zeros(len(uids))
+    centre_y = np.asarray(data["center_y"], dtype=float) if "center_y" in data else np.zeros(len(uids))
 
     # Вклад исследования не должен зависеть от того, сколько окон оно дало.
     counts = pd.Series(studies).value_counts()
@@ -169,8 +171,9 @@ def main() -> None:
             np.asarray([truth_by_uid[u] for u in inner_uids]))
 
         raw = window_scores(model, patches[test], device)
-        window_rows.extend({"sop_uid": u, "score": float(v), "fold": outer}
-                           for u, v in zip(uids[test], raw))
+        window_rows.extend(
+            {"sop_uid": u, "score": float(v), "fold": outer, "x": float(cx), "y": float(cy)}
+            for u, v, cx, cy in zip(uids[test], raw, centre_x[test], centre_y[test]))
         test_scores = image_scores(model, patches[test], uids[test], device)
         for uid, score in test_scores.items():
             if uid in truth_by_uid:
