@@ -230,8 +230,20 @@ class Application:
         # наверх то, что ценнее разметить, если человек не дойдёт до конца:
         # все положительные и отрицательные, на которых модель ошибается чаще
         # (совет fable 20.09.2026 — ловушки нужны прежде всего там).
+        # Точечная доразметка: очередь задаётся файлом со списком uid и порядком.
+        # Нужна, когда модель уже обучена и известно, где именно ей не хватает
+        # трудных отрицательных примеров — делить такую выборку на части незачем.
+        queue_file = getattr(self.args, "queue", None)
+        if queue_file:
+            with open(queue_file, newline="", encoding="utf-8-sig") as stream:
+                wanted = [r["uid"].strip() for r in csv.DictReader(stream) if r.get("uid")]
+            position = {uid: i for i, uid in enumerate(wanted)}
+            rows = [r for r in rows if r["sop_uid"].strip() in position]
+            rows.sort(key=lambda row: position[row["sop_uid"].strip()])
+            print(f"очередь из файла: {len(rows)} снимков", flush=True)
+
         part = str(getattr(self.args, "part", "all"))
-        if part != "all":
+        if part != "all" and not queue_file:
             all_studies = [r["study"].strip() for r in rows]
             print(
                 describe_split(all_studies, part, overlap=10, salt="foreign"),
@@ -1590,6 +1602,10 @@ def main():
     parser.add_argument("--port", type=int, default=8766)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--reset", action="store_true")
+    parser.add_argument(
+        "--queue",
+        help="CSV с колонкой uid: показывать только эти снимки в заданном порядке",
+    )
     parser.add_argument(
         "--part",
         default="all",
