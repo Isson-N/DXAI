@@ -64,9 +64,14 @@ def augment(batch: torch.Tensor) -> torch.Tensor:
     return batch.clamp(0, 1)
 
 
-def train_fold(x, y, weights, device, epochs, seed):
+def train_fold(x, y, weights, device, epochs, seed, init_state=None):
     torch.manual_seed(seed)
     model = PatchNet().to(device)
+    if init_state is not None:
+        state = torch.load(init_state, map_location=device)
+        if isinstance(state, dict) and "state_dict" in state:
+            state = state["state_dict"]
+        model.load_state_dict(state)
     optimiser = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=1e-4)
     schedule = torch.optim.lr_scheduler.CosineAnnealingLR(optimiser, epochs)
     loader = DataLoader(TensorDataset(x, y, weights), batch_size=64, shuffle=True)
@@ -144,6 +149,7 @@ def main() -> None:
     parser.add_argument("--size", type=int, default=96)
     parser.add_argument("--stride", type=int, default=16)
     parser.add_argument("--device", default="auto")
+    parser.add_argument("--init", default=None, help="state_dict для инициализации")
     args = parser.parse_args()
     seeds = [int(x) for x in args.seeds.split(',')] if args.seeds else [args.seed]
 
@@ -185,7 +191,7 @@ def main() -> None:
 
         # Раньше --seeds разбирался, но не использовался: обучалась одна модель.
         model = [train_fold(patches[fit], labels[fit], weights[fit],
-                            device, args.epochs, seed * 100 + outer) for seed in seeds]
+                            device, args.epochs, seed * 100 + outer, args.init) for seed in seeds]
 
         eval_patches, eval_uids = (scan_patches[scan_folds == (outer + 1) % (max(folds) + 1)],
                                    scan_uids[scan_folds == (outer + 1) % (max(folds) + 1)]) if args.scan else (patches[inner], uids[inner])
@@ -240,7 +246,7 @@ def main() -> None:
     if args.final_model:
         # Финальный ансамбль: по модели на seed, обучение на ВСЕХ окнах. Порог — медиана
         # порогов, выбранных во внешних фолдах: на всех данных порог выбрать не на чем.
-        final = [train_fold(patches, labels, weights, device, args.epochs, seed) for seed in seeds]
+        final = [train_fold(patches, labels, weights, device, args.epochs, seed, args.init) for seed in seeds]
         payload = {"models": [{k: v.cpu() for k, v in m.state_dict().items()} for m in final],
                    "threshold": float(np.median(fold_thresholds)),
                    "size": args.size, "stride": args.stride,

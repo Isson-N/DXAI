@@ -53,6 +53,7 @@ def main() -> None:
     ap.add_argument("--out", default="experiments/results/foreign_patch_nested")
     ap.add_argument("--epochs", type=int, default=40)
     ap.add_argument("--seeds", default="1,2,3")
+    ap.add_argument("--init", default=None, help="state_dict для инициализации")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -77,7 +78,7 @@ def main() -> None:
 
     def fit(mask, tag):
         return [train_fold(patches[mask], labels[mask], weights[mask], device,
-                           args.epochs, seed * 1000 + tag) for seed in seeds]
+                           args.epochs, seed * 1000 + tag, args.init) for seed in seeds]
 
     started, rows, choices = time.time(), [], []
     all_folds = sorted(set(folds))
