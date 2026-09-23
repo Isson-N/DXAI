@@ -15,7 +15,7 @@ RUN pip install --no-deps .
 # Веса внутри образа: организатор запускает контейнер без сети, подключить их снаружи нельзя.
 # CLI по умолчанию берёт каталог models относительно /app. Без этих файлов сервис молча
 # работал бы без моделей (область по размеру кадра, все нарушения = 0).
-COPY models/quality_cnn.pt models/spine_keypoints.pt models/foreign_patch.pt models/
+COPY models/quality_cnn.pt models/spine_keypoints.pt models/foreign_patch.pt models/hip_rotation_cnn.pt models/
 
 RUN useradd --create-home --uid 10001 dxaqc
 USER dxaqc

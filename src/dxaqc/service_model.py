@@ -59,6 +59,7 @@ class ServiceModel:
     keypoints: object | None = None          # dxaqc.keypoints.SpineKeypointModel
     cnn: object | None = None                # обёртка над B2 (интерфейс: probabilities(image) -> dict)
     foreign: ForeignPatchModel | None = None
+    hip_rotation: object | None = None       # B2 с энкодером, предобученным на синтетике из КТ
     thresholds: dict[str, float] = field(default_factory=dict)
     version: str = "geometry+cnn-1"
     notes: list[str] = field(default_factory=list)
@@ -96,6 +97,11 @@ class ServiceModel:
                     continue
                 if head in cnn_probs:
                     probabilities[name] = float(cnn_probs[head])
+        if region == REGION_HIP and self.hip_rotation is not None:
+            # Сравнение 23.09 (3 seed): AUC ротации 0,771 -> 0,811; голова ROI у этой модели хуже,
+            # поэтому из неё берётся только ротация.
+            probabilities[V_POSITIONING] = float(self.hip_rotation.probabilities(image)["hip_pos"])
+            thresholds[V_POSITIONING] = float(self.hip_rotation.thresholds.get("hip_pos", 0.5))
         if region == REGION_SPINE and self.foreign is not None:
             probabilities[V_FOREIGN] = self.foreign.probability(np.asarray(image.pixels))
             thresholds[V_FOREIGN] = self.foreign.threshold
@@ -142,4 +148,9 @@ def load(models_dir: str | Path, device: str = "cpu") -> ServiceModel:
             model.version = "geometry+cnn+patch-1"
         except ImportError as exc:
             model.notes.append(f"патч-модель не загружена: {exc}")
+    rotation_path = directory / "hip_rotation_cnn.pt"
+    if rotation_path.exists() and model.cnn is not None:
+        from .cnn import QualityCNN
+        model.hip_rotation = QualityCNN(rotation_path, device)
+        model.version += "+hiprot"
     return model

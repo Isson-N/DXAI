@@ -632,6 +632,8 @@ def main():
     parser.add_argument("--no-foreign-branch", dest="foreign_branch", action="store_false")
     parser.add_argument("--pretrained", dest="pretrained", action="store_true", default=True)
     parser.add_argument("--no-pretrained", dest="pretrained", action="store_false")
+    parser.add_argument("--init-encoder", default=None,
+                        help="путь к pretrain payload с ключом encoder")
     args = parser.parse_args()
     models = list(dict.fromkeys(x.strip().lower() for x in args.models.split(",")))
     if not models or set(models) - {"b0", "b1", "b2"}:
@@ -659,6 +661,11 @@ def main():
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             template = create_encoder(args.pretrained).cpu()
+        if args.init_encoder:
+            payload = torch.load(args.init_encoder, map_location="cpu")
+            if not isinstance(payload, dict) or "encoder" not in payload:
+                raise ValueError("--init-encoder должен содержать payload с ключом encoder")
+            template.load_state_dict(payload["encoder"], strict=True)
         for warning in caught:
             warnings.warn(str(warning.message))
         pretrained_loaded = args.pretrained and not any(
@@ -708,6 +715,7 @@ def main():
             "encoder_initialization_seconds": encoder_seconds if name != "b0" else 0,
             "evaluation_seconds": time.perf_counter() - started,
             "environment": environment(), "arguments": vars(args),
+            "init_encoder": args.init_encoder,
             "pretrained_loaded": pretrained_loaded if name != "b0" else None,
             "protocol": {
                 "outer_folds": 5, "inner_folds": 4, "bootstrap_replicates": 2000,
