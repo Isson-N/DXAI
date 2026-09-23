@@ -1,0 +1,44 @@
+{
+ "f1": 0.8421,
+ "choices": [
+  {
+   "outer": 0,
+   "aggregation": "max",
+   "threshold": 0.9086,
+   "inner_pooled_f1": 0.8387
+  },
+  {
+   "outer": 1,
+   "aggregation": "max",
+   "threshold": 0.9254,
+   "inner_pooled_f1": 0.7742
+  },
+  {
+   "outer": 2,
+   "aggregation": "max",
+   "threshold": 0.9842,
+   "inner_pooled_f1": 0.8889
+  },
+  {
+   "outer": 3,
+   "aggregation": "max",
+   "threshold": 0.9438,
+   "inner_pooled_f1": 0.7879
+  },
+  {
+   "outer": 4,
+   "aggregation": "max",
+   "threshold": 0.994,
+   "inner_pooled_f1": 0.8462
+  }
+ ],
+ "seeds": [
+  1,
+  2,
+  3
+ ],
+ "tp": 16,
+ "fp": 5,
+ "fn": 1,
+ "training_seconds": 2509.0
+}
