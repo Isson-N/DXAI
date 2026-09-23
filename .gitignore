@@ -47,4 +47,9 @@ experiments/results/**/oof.csv
 
 # Пофайловые предсказания и веса: содержат UID исследований организатора / производны от его данных
 experiments/results/**/oof_*.csv
-models/
+models/*
+# веса сервиса хранятся в git (репозиторий приватный); остальное в models/ — нет
+!models/quality_cnn.pt
+!models/spine_keypoints.pt
+!models/foreign_patch.pt
+!models/hip_rotation_cnn.pt

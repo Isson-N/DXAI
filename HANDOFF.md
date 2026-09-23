@@ -42,11 +42,12 @@
 | `train_baselines.py --init-encoder` | инициализация энкодера CNN из предобучения |
 | `tools/axis_puzzle.py`, `tools/fix_guide_states.py` | разбор спорных снимков «оси»; исправление состояний точек бедра |
 
-## 4. Веса — НЕ в git
+## 4. Веса
 
-`*.pt` и `models/` в `.gitignore`. Файлы лежат локально у владельца проекта
-(`~/projects/dxa-quality-ai/models/`) и на кластере Aldan (`~/dxa/models/`),
-передаются отдельно.
+Четыре файла сервиса **лежат в git** (репозиторий приватный, с 23.09): `models/quality_cnn.pt`,
+`spine_keypoints.pt`, `foreign_patch.pt`, `hip_rotation_cnn.pt` — после `git pull` сервис и Docker
+работают сразу. Остальные `*.pt` (предобучение, варианты для отката) в git НЕ хранятся: они лежат
+у владельца проекта в `~/projects/dxa-quality-ai/models/` и на Aldan в `~/dxa/models/`.
 
 | файл | размер | назначение |
 |---|---|---|
