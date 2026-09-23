@@ -104,8 +104,10 @@ class SpineKeypointModel:
         # Координаты — soft-argmax по каналу (как при обучении), наличие точки — отдельная голова.
         b, c, h, w = heatmaps.shape
         flat = heatmaps.reshape(b, c, -1).softmax(-1).reshape(b, c, h, w)
-        grid_y = torch.linspace(0, 1, h).view(1, 1, h, 1)
-        grid_x = torch.linspace(0, 1, w).view(1, 1, 1, w)
+        # Сетка на том же устройстве, что и карта: иначе на GPU каждый снимок поясницы
+        # падал с «tensors on different devices» (на CPU ошибка не проявлялась).
+        grid_y = torch.linspace(0, 1, h, device=flat.device).view(1, 1, h, 1)
+        grid_x = torch.linspace(0, 1, w, device=flat.device).view(1, 1, 1, w)
         ex = (flat * grid_x).sum(dim=(-1, -2))[0].cpu().numpy()
         ey = (flat * grid_y).sum(dim=(-1, -2))[0].cpu().numpy()
         present = torch.sigmoid(presence)[0].cpu().numpy()

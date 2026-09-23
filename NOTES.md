@@ -1183,3 +1183,16 @@ fable 5.1 (--no-stream --max-tokens 16000) — второе мнение; codex 
   предобучения. Прогноз macro-F1 сервиса: (0,909+0,455+0,833+0,583+0,571)/5 ≈ 0,670.
   Для воспроизведения: training/build_ocxr_patches.py -> pretrain_foreign.py -> train_foreign_patches.py
   --init (команды в логе scratchpad; данные ~/dxa_work/ocxr, подвыборка pick.txt).
+- 23.09.2026, СКВОЗНАЯ ПРОВЕРКА СЕРВИСА на Aldan с настоящими весами (models/: quality_cnn, spine_keypoints,
+  foreign_patch с предобучением), CLI: `python -m dxaqc.cli predict --input data/test --output X.csv
+  --models models --device cpu|cuda` (PYTHONPATH=src). На data/test (3 снимка организатора):
+  CSV со всеми колонками ТЗ + quality_prob, ошибок 0.
+  КРИТИЧЕСКИЙ ДЕФЕКТ НАЙДЕН И ИСПРАВЛЕН: на --device cuda каждый снимок поясницы падал
+  («tensors on different devices», processing_status=Failure) — в src/dxaqc/keypoints.py сетка
+  soft-argmax создавалась на CPU при карте на GPU. На CPU не проявлялось, поэтому ни один тест
+  не ловил. Стенд организатора — 2xH200: без исправления вся поясница была бы ошибкой.
+  После правки: решения CPU и GPU совпадают полностью, вероятности до 1e-6.
+  Время: CPU — поясница 6,6 с, бедро 0,1 с, всего 82 с на 3 снимка (в основном загрузка моделей);
+  GPU — поясница 1,07 с, всего 10 с.
+  ДЛЯ CODEX: добавить в smoke_test.sh прогон на --device cuda при наличии GPU — CPU-тест этот
+  класс ошибок не видит.
