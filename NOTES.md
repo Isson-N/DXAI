@@ -1196,3 +1196,10 @@ fable 5.1 (--no-stream --max-tokens 16000) — второе мнение; codex 
   GPU — поясница 1,07 с, всего 10 с.
   ДЛЯ CODEX: добавить в smoke_test.sh прогон на --device cuda при наличии GPU — CPU-тест этот
   класс ошибок не видит.
+- 23.09.2026, КОНТЕЙНЕР: найдено, что docker/run.sh не передавал веса, а в образе их не было —
+  контейнер работал без моделей (область по размеру кадра, нарушения = 0), smoke-тест проверял
+  только формат и «проходил». Исправлено: веса COPY в образ, requirements.txt = полный слепок
+  ~/dxa/.venv с Aldan (73 пакета, torch 2.8.0/timm 1.0.29, +cu128 снят — PyPI torch 2.8.0
+  по умолчанию cu128; packaging из conda-пути заменён на 26.3), DEVICE=cuda в run.sh,
+  smoke-тест падает при Failure. СБОРКА НЕ ПРОВЕРЕНА: у пользователя agent нет прав на
+  /var/run/docker.sock. Команда: sudo bash docker/smoke_test.sh.

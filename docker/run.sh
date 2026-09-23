@@ -14,8 +14,11 @@ else
   MOUNT=(-v "$(dirname "$INPUT"):/input:ro"); IN="/input/$(basename "$INPUT")"
 fi
 
-docker run --rm --network none \
+# DEVICE=cuda — запуск на GPU (нужен nvidia-container-toolkit); по умолчанию CPU.
+DEVICE="${DEVICE:-cpu}"
+GPU=(); [ "$DEVICE" = "cuda" ] && GPU=(--gpus all)
+docker run --rm --network none "${GPU[@]}" \
   --user "$(id -u):$(id -g)" \
   "${MOUNT[@]}" -v "$OUTDIR:/output" \
-  "$TAG" predict --input "$IN" --output "/output/results.$FORMAT"
+  "$TAG" predict --input "$IN" --output "/output/results.$FORMAT" --device "$DEVICE"
 echo "результат: $OUTDIR/results.$FORMAT, ошибки: $OUTDIR/errors.csv"

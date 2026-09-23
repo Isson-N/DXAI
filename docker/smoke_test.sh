@@ -26,5 +26,8 @@ for r in rows:
         assert r["quality_class"] in {"0", "1"}, r
         assert 0.0 <= float(r["quality_prob"]) <= 1.0, r
         assert float(r["time_of_processing"]) >= 0, r
-print(f"smoke-тест пройден: {len(rows)} строк")
+# Раньше тест принимал сервис без моделей и строки с Failure: проверялся только формат.
+failed = [r["path_to_study"] for r in rows if r["processing_status"] != "Success"]
+assert not failed, f"снимки с ошибкой обработки: {failed}"
+print(f"smoke-тест пройден: {len(rows)} строк, все Success")
 EOF
