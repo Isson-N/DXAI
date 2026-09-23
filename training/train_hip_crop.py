@@ -40,7 +40,7 @@ def main():
     ap.add_argument("--device", default="auto")
     a = ap.parse_args(); seeds = [int(x) for x in a.seeds.split(",") if x.strip()]
     device = "cuda" if a.device == "auto" and torch.cuda.is_available() else ("cpu" if a.device == "auto" else a.device)
-    idx = pd.read_csv(a.index); pts = pd.read_csv(a.points); folds = pd.read_csv(a.folds); cnn = pd.read_csv(a.cnn)[["sop_uid", "hip_pos_prob"]]
+    idx = pd.read_csv(a.index); pts = pd.read_csv(a.points); pts = pts.drop(columns=[c for c in ("study", "study_n", "fold") if c in pts.columns]); folds = pd.read_csv(a.folds); cnn = pd.read_csv(a.cnn)[["sop_uid", "hip_pos_prob"]]
     df = idx[idx.region.eq("hip") & idx.y_pos.notna()].copy(); df = df.merge(pts, on="sop_uid", how="left").merge(cnn, on="sop_uid", how="left").merge(folds[["study","fold"]], on="study", how="left", suffixes=("", "_fold"))
     df["fold"] = df["fold_fold"].fillna(df.get("fold", np.nan)).astype(int)
     xs, ys, labels, studies, uids, cnn_scores = [], [], [], [], [], []
