@@ -1,13 +1,27 @@
 #!/usr/bin/env bash
-# Smoke-тест контейнера (план v2, этап 1): сборка → запуск без сети на data/test → проверка формата.
+# Сборка, запуск без сети и проверка формата на тестовом наборе.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TAG="dxaqc:smoke"
+INPUT="${1:-$ROOT/data/test}"
+if [ ! -d "$INPUT" ] && [ ! -f "$INPUT" ]; then
+  echo "Нет входного набора: $INPUT" >&2
+  exit 1
+fi
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
 bash "$ROOT/docker/build.sh" "$TAG"
-bash "$ROOT/docker/run.sh" "$ROOT/data/test" "$OUT" csv "$TAG"
+"${CONTAINER_ENGINE:-docker}" run --rm --network none --entrypoint python "$TAG" -c '
+from dxaqc.service_model import load
+model = load("/app/models")
+assert model.keypoints is not None, model.notes
+assert model.cnn is not None, model.notes
+assert model.foreign is not None, model.notes
+assert model.hip_rotation is not None, model.notes
+print("Все четыре модели загружены")
+'
+bash "$ROOT/docker/run.sh" "$INPUT" "$OUT" csv "$TAG"
 
 python3 - "$OUT/results.csv" <<'EOF'
 import csv, sys

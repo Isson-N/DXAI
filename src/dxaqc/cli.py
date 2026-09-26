@@ -9,6 +9,7 @@ from pathlib import Path
 from . import __version__
 from .model import StubModel
 from . import service_model
+from .api import serve
 from .pipeline import run
 from .report import write_errors, write_results
 
@@ -21,14 +22,22 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--output", required=True, type=Path, help="файл результата .csv или .xlsx")
     p.add_argument("--errors", type=Path, help="файл ошибок (по умолчанию errors.csv рядом с результатом)")
     p.add_argument("--models", type=Path, default=Path("models"),
-                   help="каталог с весами (spine_keypoints.pt, quality_cnn.pt)")
+                   help="каталог с четырьмя весами моделей")
     p.add_argument("--device", default="cpu", help="cpu или cuda")
     p.add_argument("--stub", action="store_true", help="заглушка вместо моделей (проверка конвейера)")
+    api = sub.add_parser("serve", help="локальный HTTP API пакетной обработки")
+    api.add_argument("--host", default="127.0.0.1")
+    api.add_argument("--port", type=int, default=8000)
+    api.add_argument("--input-root", required=True, type=Path)
+    api.add_argument("--output-root", required=True, type=Path)
+    api.add_argument("--models", type=Path, default=Path("models"))
+    api.add_argument("--device", default="cpu", choices=("cpu", "cuda"))
+    api.add_argument("--stub", action="store_true", help="только для проверки API")
     parser.add_argument("--version", action="version", version=f"dxaqc {__version__}")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    if not args.input.exists():
+    if args.command == "predict" and not args.input.exists():
         logging.error("вход не найден: %s", args.input)
         return 2
     if args.stub:
@@ -42,6 +51,14 @@ def main(argv: list[str] | None = None) -> int:
             logging.error("в каталоге %s нет ни одной модели; запустите с --stub для проверки конвейера",
                           args.models)
             return 2
+        if args.command == "serve" and any(part is None for part in
+                                            (model.keypoints, model.cnn, model.foreign,
+                                             model.hip_rotation)):
+            logging.error("API требует все четыре модели в каталоге %s", args.models)
+            return 2
+    if args.command == "serve":
+        serve(args.host, args.port, model, args.input_root, args.output_root)
+        return 0
     rows, errors = run(args.input, model)
     write_results(rows, args.output)
     write_errors(errors, args.errors or args.output.with_name("errors.csv"))

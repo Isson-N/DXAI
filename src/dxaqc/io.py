@@ -48,7 +48,7 @@ def extract_if_archive(src: Path, workdir: Path) -> Path:
             for info in z.infolist():
                 name = _zip_name(info)
                 target = (dst / name).resolve()
-                if not str(target).startswith(str(dst.resolve())):
+                if not target.is_relative_to(dst.resolve()):
                     continue  # защита от путей вида ../
                 if info.is_dir():
                     target.mkdir(parents=True, exist_ok=True)

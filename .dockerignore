@@ -5,6 +5,8 @@ archive/
 reviews/
 experiments/
 tests/
+artifacts/
+.idea/
 .git/
 **/__pycache__/
 *.egg-info/
