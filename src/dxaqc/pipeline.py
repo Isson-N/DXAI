@@ -6,6 +6,7 @@ import logging
 import tempfile
 import time
 from pathlib import Path
+from typing import Callable
 
 from .io import NotAnImage, extract_if_archive, list_candidate_files, looks_like_dicom, read_image
 from .labels import STATUS_FAIL, STATUS_OK
@@ -20,7 +21,7 @@ def _cache_key(image, model_version: str) -> str:
     return h.hexdigest()
 
 
-def run(input_path: Path, model) -> tuple[list[dict], list[dict]]:
+def run(input_path: Path, model, synchronize: Callable[[], None] | None = None) -> tuple[list[dict], list[dict]]:
     rows: list[dict] = []
     errors: list[dict] = []
     cache: dict[str, object] = {}
@@ -48,6 +49,8 @@ def run(input_path: Path, model) -> tuple[list[dict], list[dict]]:
                 if key not in cache:
                     cache[key] = model.predict(image)
                 pred = cache[key]
+                if synchronize is not None:
+                    synchronize()
                 rows.append({
                     "path_to_study": rel,
                     "study_uid": image.study_uid,
