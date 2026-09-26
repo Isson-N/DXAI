@@ -32,11 +32,8 @@ extra-data/*
 .pytest_cache/
 .idea/
 
-# Локальные сборочные материалы презентации; в git хранится только итоговый файл
-artifacts/*
-!artifacts/pptx_output/
-artifacts/pptx_output/*
-!artifacts/pptx_output/DXA_QC_ЛЦТ2026.pptx
+# Локальные сборочные материалы и итоговые файлы презентации
+artifacts/
 
 # Обёртки для конкретного пользователя и задания на сервере Aldan
 training/run_aldan_*.sh
