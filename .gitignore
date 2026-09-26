@@ -30,6 +30,16 @@ extra-data/*
 # Python-пакет и тесты
 *.egg-info/
 .pytest_cache/
+.idea/
+
+# Локальные сборочные материалы презентации; в git хранится только итоговый файл
+artifacts/*
+!artifacts/pptx_output/
+artifacts/pptx_output/*
+!artifacts/pptx_output/DXA_QC_ЛЦТ2026.pptx
+
+# Обёртки для конкретного пользователя и задания на сервере Aldan
+training/run_aldan_*.sh
 
 # Материалы организатора (лекции, расшифровки)
 data/*.txt
