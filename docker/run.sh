@@ -15,9 +15,9 @@ else
   MOUNT=(-v "$(dirname "$INPUT"):/input:ro"); IN="/input/$(basename "$INPUT")"
 fi
 
-# DEVICE=cuda — запуск на GPU (нужен nvidia-container-toolkit); по умолчанию CPU.
+# DEVICE=cuda enables GPU; GPU_MODE=manual passes devices on hosts without toolkit integration.
 DEVICE="${DEVICE:-cpu}"
-GPU=(); [ "$DEVICE" = "cuda" ] && GPU=(--gpus all)
+source "$(dirname "$0")/gpu_args.sh"
 USER_ARGS=(--user "$(id -u):$(id -g)")
 if [ "$(basename "$ENGINE")" = podman ] && [ "$("$ENGINE" info --format '{{.Host.Security.Rootless}}')" = true ]; then
   USER_ARGS=(--user 0:0)

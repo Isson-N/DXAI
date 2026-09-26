@@ -13,7 +13,7 @@ if [ ! -d "$INPUT" ]; then
   exit 1
 fi
 mkdir -p "$OUTDIR"
-GPU=(); [ "$DEVICE" = cuda ] && GPU=(--gpus all)
+source "$(dirname "$0")/gpu_args.sh"
 USER_ARGS=(--user "$(id -u):$(id -g)")
 if [ "$(basename "$ENGINE")" = podman ] && [ "$("$ENGINE" info --format '{{.Host.Security.Rootless}}')" = true ]; then
   USER_ARGS=(--user 0:0)

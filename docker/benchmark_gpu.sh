@@ -5,6 +5,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INPUT="$(realpath "$1")"
 TAG="${2:-dxaqc:0.1.0}"
 ENGINE="${CONTAINER_ENGINE:-docker}"
+DEVICE=cuda
+source "$(dirname "$0")/gpu_args.sh"
 
 if [ -d "$INPUT" ]; then
   MOUNT=(-v "$INPUT:/input:ro"); IN=/input
@@ -20,6 +22,6 @@ if [ "$(basename "$ENGINE")" = podman ] && [ "$("$ENGINE" info --format '{{.Host
   USER_ARGS=(--user 0:0)
 fi
 
-"$ENGINE" run --rm --network none --gpus all "${USER_ARGS[@]}" \
+"$ENGINE" run --rm --network none "${GPU[@]}" "${USER_ARGS[@]}" \
   "${MOUNT[@]}" -v "$ROOT/tools/benchmark_gpu.py:/app/benchmark_gpu.py:ro" \
   --entrypoint python "$TAG" /app/benchmark_gpu.py --input "$IN" --models /app/models
